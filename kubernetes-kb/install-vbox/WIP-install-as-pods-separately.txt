@@ -1,0 +1,425 @@
+==================================================================
+INSTALL AS PODS - SEPARATELY INSTALL EACH POD - NOT WITH INIT
+==================================================================
+
+
+redo this whole thing - redo this - changing CIDR to something different from VM IPs
+(SEE CALICO NOTES FILE)
+
+
+
+
+
+
+MACHINE- K1
+
+ETCD
+MASTER
+WORKER
+FLANNEL/CALICO
+
+=================
+INITIAL VM SETUP
+=================
+---------------------------------
+HOSTNAME AND IP SETUP
+---------------------------------
+For Kubernetes: (set IPs matching this or vice-versa)
+NOTE: Changing cidr to 192.168.0.0 (instead of 192.168.11.0 as directed in main web article)
+--apiserver-advertise-address=192.168.11.200 --pod-network-cidr=192.168.0.0/16
+
+# hostnamectl set-hostname kubemaster0
+Set IP for = enp0s8 172.168.1.101 netmask 255.255.255.0
+Set IP for = enp0s9 192.168.1.101 netmask 255.255.255.0
+
+Add main IP to /etc/hosts
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+...
+...
+...
+...
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+Restart the machine and ensure hostname and IPs show up.
+# hostname
+# ifconfig enp0s8
+# ifconfig enp0s9
+
+---------------------------------
+DISABLE SELINUX
+---------------------------------
+# setenforce 0
+
+Edit the file /etc/sysconfig/selinux and set enforcing as disabled
+
+---------------------------------
+DISABLE SWAP
+---------------------------------
+# swapoff -a
+
+Edit /etc/fstab and comment out line of swap
+#/dev/mapper/ol-swap     swap                    swap    defaults        0 0
+
+---------------------------------
+ENABLE br_netfilter
+---------------------------------
+# modprobe br_netfilter
+# echo '1' > /proc/sys/net/bridge/bridge-nf-call-iptables
+
+Also, put it in /etc/sysctl.conf as follows:
+net.bridge.bridge-nf-call-iptables = 1
+
+And, make it persistent:
+# sysctl -p
+
+---------------------------------------
+INSTALL DOCKER-CE (community edition)
+---------------------------------------
+- FIRST INSTALL CONTAINER-SELINUX > v2.9
+http://mirror.centos.org/centos/7/extras/x86_64/Packages/container-selinux-2.68-1.el7.noarch.rpm
+
+--> Download this, and then do: (dont do rpm -ivh container-selinux-2.74-1.el7.noarch.rpm)
+# yum install container-selinux-2.74-1.el7.noarch.rpm
+
+- INSTALL DOCKER
+Check, and install if needed - dependencies with the following command:
+# yum install -y yum-utils device-mapper-persistent-data lvm2
+
+Next, add the Docker-ce repository with the command:
+# yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+
+Install Docker-ce with the command:
+# yum install -y docker-ce
+
+- ENABLE DOCKER SERVICE
+# systemctl enable docker
+
+- START DOCKER
+# service docker start
+
+- CHECK CGROUP
+# docker info | grep -i cgroup
+Cgroup Driver: cgroupfs
+
+==========================================
+PULL DOCKER IMAGES NEEDED FOR KUBERNETES
+==========================================
+
+- ETCD
+# docker pull quay.io/coreos/etcd
+
+- MASTER (with additional components for workers also)
+--- FOR SPECIFIC VERSIONS
+docker pull gcr.io/google_containers/kube-apiserver-amd64:v1.12.4 
+docker pull gcr.io/google_containers/kube-scheduler-amd64:v1.12.4 
+docker pull gcr.io/google_containers/kube-controller-manager-amd64:v1.12.4 
+docker pull gcr.io/google_containers/kube-proxy-amd64:v1.12.4 
+docker pull gcr.io/google-containers/kube-addon-manager-amd64:v8.6 
+docker pull gcr.io/google_containers/metrics-server-amd64:v0.2.1 
+docker pull gcr.io/google-containers/rescheduler:v0.3.1  
+docker pull quay.io/calico/node:v3.0.1 
+docker pull quay.io/calico/cni:v2.0.0 
+docker pull k8s.gcr.io/pause-amd64:3.1 
+# Add this to make a common image for master and woker
+docker pull quay.io/jcmoraisjr/haproxy-ingress:v0.5 
+
+--- FOR LATEST
+docker pull gcr.io/google_containers/kube-apiserver-amd64
+docker pull gcr.io/google_containers/kube-scheduler-amd64
+docker pull gcr.io/google_containers/kube-controller-manager-amd64
+docker pull gcr.io/google_containers/kube-proxy-amd64
+docker pull gcr.io/google-containers/kube-addon-manager-amd64
+docker pull gcr.io/google_containers/metrics-server-amd64
+docker pull gcr.io/google-containers/rescheduler
+docker pull quay.io/calico/node
+docker pull quay.io/calico/cni
+docker pull k8s.gcr.io/pause-amd64
+# Add this to make a common image for master and woker
+docker pull quay.io/jcmoraisjr/haproxy-ingress
+
+- WORKER ONLY
+--- FOR SPECIFIC VERSIONS
+docker pull gcr.io/google_containers/kube-proxy-amd64:v1.12.4 
+docker pull k8s.gcr.io/pause-amd64:3.1 
+docker pull gcr.io/google_containers/node-problem-detector:v0.4.1 
+docker pull quay.io/jcmoraisjr/haproxy-ingress:v0.5 
+docker pull quay.io/calico/node:v3.0.1 
+docker pull quay.io/calico/cni:v2.0.0 
+
+--- FOR LATEST
+docker pull gcr.io/google_containers/kube-proxy-amd64
+docker pull k8s.gcr.io/pause-amd64
+docker pull gcr.io/google_containers/node-problem-detector
+docker pull quay.io/jcmoraisjr/haproxy-ingress
+docker pull quay.io/calico/node
+docker pull quay.io/calico/cni
+
+=======
+ETCD
+=======
+- HIGH LEVEL STEPS
+Pull image as mentioned earlier.
+Create an etcd service with IP settings.
+Start the service so that it starts etcd image as container with correct settings.
+
+--------------
+ETCD SERVICE
+--------------
+To start etcd container when host machine starts - create a systemd service.
+
+Reference docker command to start the container with settings:
+NOTE: The IP address 101.192.217.105 and other such of the hosts - not of the container.
+
+/usr/bin/docker run --rm --net=host --name etcd -v /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:/etc/ssl/certs/ca-certificates.crt -v /data/etcd:/data -v /var/lib/etcdbak:/var/lib/etcdbak -v /opt/k8s/openssl:/opt/k8s/openssl --env ETCDCTL_CERT=/opt/k8s/openssl/server.crt --env ETCDCTL_KEY=/opt/k8s/openssl/server.key --env ETCDCTL_CACERT=/opt/k8s/openssl/ca.crt -e ETCD_INITIAL_CLUSTER=101.192.217.104=https://101.192.217.104:2380,101.192.217.105=https://101.192.217.105:2380 -e ETCD_INITIAL_CLUSTER_STATE=existing -e ETCDCTL_API=3 -e ETCD_SNAPSHOT_COUNT={ETCD_SNAPSHOT_COUNT} gcr.io/google_containers/etcd-amd64:3.1.11 etcd -name 101.192.217.105 -initial-advertise-peer-urls HTTPS://101.192.217.105:2380 -listen-peer-urls HTTPS://0.0.0.0:2380 -listen-client-urls HTTPS://101.192.217.105:2379,HTTPS://127.0.0.1:2379 -advertise-client-urls HTTPS://101.192.217.105:2379 -cert-file /opt/k8s/openssl/server.crt -key-file /opt/k8s/openssl/server.key -client-cert-auth -trusted-ca-file /opt/k8s/openssl/ca.crt -peer-cert-file /opt/k8s/openssl/server.crt -peer-key-file /opt/k8s/openssl/server.key -peer-client-cert-auth -peer-trusted-ca-file /opt/k8s/openssl/ca.crt -data-dir=/data
+
+
+-----------------------------------------------------------------
+ETCD SERVICE ENVIRONMENT FILE:  /opt/k8s/env/etcd.service.env
+-----------------------------------------------------------------
+
+# ENVIRONMENT VARIABLES FOR ETCD.SERVICE
+
+#---------------------------------------------------------
+#Reference
+#/usr/bin/docker run --rm --net=host --name etcd -v /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:/etc/ssl/certs/ca-certificates.crt -v /data/etcd:/data -v /var/lib/etcdbak:/var/lib/etcdbak -v /opt/k8s/openssl:/opt/k8s/openssl --env ETCDCTL_CERT=/opt/k8s/openssl/server.crt --env ETCDCTL_KEY=/opt/k8s/openssl/server.key --env ETCDCTL_CACERT=/opt/k8s/openssl/ca.crt -e ETCD_INITIAL_CLUSTER=101.192.217.104=https://101.192.217.104:2380,101.192.217.105=https://10.92.217.105:2380 -e ETCD_INITIAL_CLUSTER_STATE=existing -e ETCDCTL_API=3 -e ETCD_SNAPSHOT_COUNT={ETCD_SNAPSHOT_COUNT} gcr.io/google_containers/etcd-amd64:3.1.11 etcd -name 101.192.217.105 -initial-advertise-peer-urls HTTPS://10.92.217.105:2380 -listen-peer-urls HTTPS://0.0.0.0:2380 -listen-client-urls HTTPS://101.192.217.105:2379,HTTPS://127.0.0.1:2379 -advertise-client-urls HTTPS://101.192.217.105:2379 -cert-file /opt/k8s/openssl/server.crt -key-file /opt/k8s/openssl/server.key -client-cert-auth -trusted-ca-file /opt/k8s/openssl/ca.crt -peer-cert-file /opt/k8s/openssl/server.crt -peer-key-file /opt/k8s/openssl/server.key -peer-client-cert-auth -peer-trusted-ca-file /opt/k8s/openssl/ca.crt -data-dir=/data
+#---------------------------------------------------------
+
+ETCD_IMAGE=quay.io/coreos/etcd
+ETCD_NODE_NAME=192.168.1.101
+ETCD_CLUSTER_NAME=etcd
+DATA_DIR=/data
+ETCD_INITIAL_CLUSTER="192.168.1.101=http://192.168.1.101:2380"
+#ETCD_INITIAL_CLUSTER="etcd1=http://192.168.2.101:2380,etcd2=http://192.168.2.102:2380"
+ETCD_INITIAL_CLUSTER_STATE=new
+ETCD_INITIAL_ADVERTISE_PEER_URLS="http://192.168.1.101:2380"
+ETCD_LISTEN_PEER_URLS="http://0.0.0.0:2380"
+ETCD_LISTEN_CLIENT_URLS="http://192.168.1.101:2379,http://127.0.0.1:2379"
+ETCD_ADVERTISE_CLIENT_URLS="http://192.168.1.101:2379"
+
+VOL_DATA=/data/etcd:/data
+VOL_BKP=/var/lib/etcdbak:/var/lib/etcdbak
+
+
+# Key/Cert - will do later TBD
+## Client Env Vars
+#Environment=ETCD_CA_FILE=/path/to/CA.pem
+#Environment=ETCD_CERT_FILE=/path/to/server.crt
+#Environment=ETCD_KEY_FILE=/path/to/server.key
+## Peer Env Vars
+#Environment=ETCD_PEER_CA_FILE=/path/to/CA.pem
+#Environment=ETCD_PEER_CERT_FILE=/path/to/peers.crt
+#Environment=ETCD_PEER_KEY_FILE=/path/to/peers.key
+
+--------------------------------------------------------
+ETCD SERVICE FILE:  /etc/systemd/system/etcd.service
+--------------------------------------------------------
+NOTE: Use "WantedBy=multi-user.target" --> WantedBy=local.target kept jumping to execstop upon vm restart
+
+(This file contents worked)
+
+[Unit]
+Description=Start etcd service
+DefaultDependencies=no
+After=docker.service
+
+[Service]
+#Type=simple
+#RemainAfterExit=true
+EnvironmentFile=/opt/k8s/env/etcd.service.env
+ExecStart=/opt/k8s/etcd/etcd_service_start.sh
+ExecStop=/bin/kill -WINCH ${MAINPID}
+
+#Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+#This did not work - WantedBy=local.target - it kept starting and immediately stopping upon machine start
+
+--------
+- Other options
+[Unit]
+Description=ETCD container
+DefaultDependencies=no
+After=docker.service
+
+[Service]
+EnvironmentFile=/opt/k8s/env/etcd.service.env
+ExecStart=/opt/k8s/etcd/etcd_service_start.sh
+#Restart=always
+
+#ExecStop=/usr/bin/docker stop -t 2 etcd
+#ExecStop=/opt/k8s/etcd/etcd_service_stop.sh
+ExecStop=/bin/kill -WINCH ${MAINPID}
+
+[Install]
+WantedBy=multi-user.target
+
+--------------------------------------------------------
+ETCD STARTUP FILE:  /opt/k8s/etcd/etcd_service_start.sh
+--------------------------------------------------------
+#!/bin/bash
+
+exec >> /tmp/etcd_service_start.log 2>> /tmp/start_etcd_service_start.log
+
+echo
+echo INFO - Starting at `date`
+
+# Sourcing of env file not required as that is done in etcd.service file
+#. /opt/k8s/env/etcd.service.env
+
+ExecStart="/usr/bin/docker run --rm --net=host --name etcd 
+ -v ${VOL_DATA} -v ${VOL_BKP} \
+ -e ETCD_INITIAL_CLUSTER=${ETCD_INITIAL_CLUSTER} \
+ -e ETCD_INITIAL_CLUSTER_STATE=${ETCD_INITIAL_CLUSTER_STATE} \
+ ${ETCD_IMAGE} etcd -name ${ETCD_NODE_NAME} \
+ -data-dir /data \
+ -initial-advertise-peer-urls=${ETCD_INITIAL_ADVERTISE_PEER_URLS} \
+ -listen-peer-urls=${ETCD_LISTEN_PEER_URLS} \
+ -listen-client-urls=${ETCD_LISTEN_CLIENT_URLS} \
+ -advertise-client-urls=${ETCD_ADVERTISE_CLIENT_URLS} \
+ -auto-tls \
+ -peer-auto-tls"
+
+$ExecStart
+
+echo ==================================
+
+--------------------------------------------------------
+ETCD STOP FILE:  /opt/k8s/etcd/etcd_service_stop.sh
+--------------------------------------------------------
+#!/bin/bash
+
+exec >> /tmp/etcd_service_stop.log 2>> /tmp/start_etcd_service_stop.log
+
+echo
+echo INFO - Starting at `date`
+
+ExecStop="/usr/bin/docker stop -t 2 etcd"
+
+$ExecStop
+
+echo ==================================
+
+
+==================================
+SECURING ETCD - WIP
+==================================
+Generate key and certificate
+# openssl req  -nodes -new -x509  -keyout server.key -out server.cert
+
+ETCD startup secure (reference command):
+/usr/bin/docker run --rm --net=host --name etcd 
+-v /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:/etc/ssl/certs/ca-certificates.crt 
+-v /data/etcd:/data -v /var/lib/etcdbak:/var/lib/etcdbak -v /opt/k8s/openssl:/opt/k8s/openssl 
+--env ETCDCTL_CERT=/opt/k8s/openssl/server.crt --env ETCDCTL_KEY=/opt/k8s/openssl/server.key 
+--env ETCDCTL_CACERT=/opt/k8s/openssl/ca.crt -e ETCD_INITIAL_CLUSTER=101.192.217.104=https://101.192.217.104:2380,101.192.217.105=https://101.192.217.105:2380 
+-e ETCD_INITIAL_CLUSTER_STATE=existing -e ETCDCTL_API=3 -e ETCD_SNAPSHOT_COUNT={ETCD_SNAPSHOT_COUNT} 
+gcr.io/google_containers/etcd-amd64:3.1.11 etcd -name 101.192.217.105 -initial-advertise-peer-urls 
+#
+# HTTPS instead of HTTP
+HTTPS://101.192.217.105:2380 -listen-peer-urls HTTPS://0.0.0.0:2380 -listen-client-urls 
+HTTPS://101.192.217.105:2379,HTTPS://127.0.0.1:2379 -advertise-client-urls HTTPS://101.192.217.105:2379 
+#
+# here the certs-keys are
+-cert-file /opt/k8s/openssl/server.crt 
+-key-file /opt/k8s/openssl/server.key 
+-client-cert-auth 
+-trusted-ca-file /opt/k8s/openssl/ca.crt
+#
+# cert-keys for peers
+-peer-cert-file /opt/k8s/openssl/server.crt -peer-key-file /opt/k8s/openssl/server.key 
+-peer-client-cert-auth -peer-trusted-ca-file /opt/k8s/openssl/ca.crt -data-dir=/data
+
+
+==================================
+APPENDIX
+==================================
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Reference etcd.service file:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        [Unit]
+        Description=etcd
+        Wants=consul.service docker.service
+
+        [Service]
+        Type=simple
+        User=root
+        Group=root
+        IOSchedulingClass=2
+        IOSchedulingPriority=0
+        EnvironmentFile=/etc/environment
+        ExecStartPre=/usr/bin/systemctl --quiet is-active docker
+        ExecStartPre=/usr/bin/systemctl --quiet is-active consul
+        ExecStartPre=/opt/k8s/generate-server-tls.sh
+        ExecStartPre=/opt/k8s/etcd_prestart.sh
+        ExecStartPre=/usr/local/bin/consul-template -once \
+          -template "/opt/company-ctmpl/k8s-etcd/service-k8s-etcd.json.ctmpl:/etc/consul.d/service-k8s-etcd.json"
+        ExecStart=/opt/k8s/startEtcd.sh
+        ExecStartPost=/usr/bin/systemctl reload consul
+        ExecStartPost=/opt/k8s/etcd_io.sh
+        ExecStop=/bin/kill -WINCH ${MAINPID}
+        Restart=on-failure
+        KillSignal=SIGINT
+        StandardOutput=syslog
+        StandardError=syslog
+        NotifyAccess=all
+        RestartSec=10
+
+        [Install]
+        WantedBy=multi-user.target
+
+--> Execstart calls this function eventualy: (also see HTTP-PROTO section below)
+         /usr/bin/docker run --rm \
+            --net=host \
+            --name etcd \
+            -v /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:/etc/ssl/certs/ca-certificates.crt \
+            -v /data/etcd:/data \
+            -v /var/lib/etcdbak:/var/lib/etcdbak \
+            -v /opt/k8s/openssl:/opt/k8s/openssl \
+            ${ETCD_TLS_ENV_VAR} \
+            -e ETCD_INITIAL_CLUSTER="$1" \
+            -e ETCD_INITIAL_CLUSTER_STATE="$2" \
+            -e ETCDCTL_API=3 \
+            -e ETCD_SNAPSHOT_COUNT={ETCD_SNAPSHOT_COUNT} \
+            ${K8S_ETCD_CONTAINER}:${ETCD_VERSION} etcd \
+            -name ${LOCAL_IPV4} \
+            -initial-advertise-peer-urls ${ETCD_HTTP_PROTO}://${LOCAL_IPV4}:${ETCD_PEER_PORT:-2380} \
+            -listen-peer-urls ${ETCD_HTTP_PROTO}://0.0.0.0:${ETCD_PEER_PORT:-2380} \
+            -listen-client-urls ${ETCD_HTTP_PROTO}://${GUEST_IPV4:-$LOCAL_IPV4}:${ETCD_PORT:-2379},${ETCD_HTTP_PROTO}://127.0.0.1:${ETCD_PORT:-2379} \
+            -advertise-client-urls ${ETCD_HTTP_PROTO}://${LOCAL_IPV4}:${ETCD_PORT:-2379} \
+            ${ETCD_PEER_PARAM} \
+            -data-dir=/data
+
+Basic reference:
+Model: redis service (much basic one) - To start redis1 container - /etc/systemd/system/redis1.service
+    [Unit]
+    Description=Redis container
+    After=docker.service
+
+    [Service]
+    Restart=always
+    ExecStart=/usr/bin/docker start -a redis1
+    ExecStop=/usr/bin/docker stop -t 2 redis1
+
+    [Install]
+    WantedBy=local.target
+
+------------
+HTTP-PROTO
+------------
+Also see: https://coreos.com/etcd/docs/latest/op-guide/security.html
+
+To use https instead of http, cert, key and cacert are required:
+
+  ETCD_TLS_ENV_VAR="--env ETCDCTL_CERT=/opt/k8s/openssl/server.crt \
+                --env ETCDCTL_KEY=/opt/k8s/openssl/server.key \
+                --env ETCDCTL_CACERT=/opt/k8s/openssl/ca.crt"
+  ETCD_PEER_PARAM="-cert-file /opt/k8s/openssl/server.crt \
+                   -key-file /opt/k8s/openssl/server.key \
+                   -client-cert-auth  \
+                   -trusted-ca-file /opt/k8s/openssl/ca.crt \
+                   -peer-cert-file /opt/k8s/openssl/server.crt \
+                   -peer-key-file /opt/k8s/openssl/server.key \
+                   -peer-client-cert-auth  \
+                   -peer-trusted-ca-file   /opt/k8s/openssl/ca.crt"
+  ETCD_HTTP_PROTO="HTTPS"

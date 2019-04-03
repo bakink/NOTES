@@ -14,7 +14,7 @@ NOTE: tail -f /dev/null is necessary so that the machine keeps doing something a
 
 DAEMON WITH SOME LISTENING SERVICE RUNNING IN IT
 NOTE: Daemon runs below may exit if there is nothig running and listening in the container
-# Without port forwarding:
+# Without port forwarding: (-d for daemon. without it, it will run in foreground)
 $ docker run --name <container name> -d <image name>
 $ docker run --name pg_test -d eg_postgresql
 
@@ -27,8 +27,15 @@ $ docker run --name pg_test2 -p 30001:5432 -d eg_postgresql
 $ docker run --name sengraf1 -it -p 8080:8081 -p 3000:3001 -d <image id> tail -f /dev/null
 
 #--------------------------------
-# Get into a running container 
+# Get into a running container (say, like ssh)
+Method1:
 docker exec -it <container id> /bin/bash
+
+Method2:
+$ sudo docker attach 665b4a1e17b6 #by ID
+or
+$ sudo docker attach loving_heisenberg #by Name
+$ root@665b4a1e17b6:/#
 
 #--------------------------------
 # Run a command in a running container
@@ -39,8 +46,14 @@ docker exec -it <container id> <command>
 docker ps -q -a -f status=exited
 
 #--------------------------------
+# Stop containers
+
+docker stop <container name>
+
+#--------------------------------
 # Remove containers
 
+(stop before remove)
 # Remove exited containers
 # http://blog.yohanliyanage.com/2015/05/docker-clean-up-after-yourself/
 docker rm -v $(docker ps -a -q -f status=exited)
@@ -56,7 +69,7 @@ docker rm -f <container name>
 
 #--------------------------------
 # Remove an image
-docker rm <image name>
+docker rmi <image name>
 
 #--------------------------------
 # List container details
