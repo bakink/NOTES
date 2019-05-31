@@ -12,6 +12,7 @@ https://www.digitalocean.com/community/tags/docker?type=tutorials - many tutoria
 https://www.digitalocean.com/community/tutorials/the-docker-ecosystem-an-introduction-to-common-components
 
 How to create images using Dockerfile:
+https://www.sitepoint.com/how-to-build-an-image-with-the-dockerfile/
 https://www.howtoforge.com/tutorial/how-to-create-docker-images-with-dockerfile/
 (some hints - http://phusion.github.io/baseimage-docker/)
 https://www.ianlewis.org/en/creating-smaller-docker-images
@@ -37,6 +38,7 @@ http://www.thegeekstuff.com/2010/01/debootstrap-minimal-debian-ubuntu-installati
 
 Opening a port of the container:
 https://forums.docker.com/t/how-to-expose-port-on-running-container/3252/12
+https://docs.docker.com/config/containers/container-networking/
 
 SSH service:
 https://github.com/docker/docker.github.io/blob/master/engine/examples/running_ssh_service.md
@@ -62,6 +64,13 @@ https://docs.docker.com/engine/examples/running_redis_service/#create-your-web-a
 
 SWARM WITH CONSUL
 http://clusterhq.com/2016/03/09/fun-with-swarm-part1/#setting-up-a-swarm-cluster-with-consul
+
+USING PRIVATE REGISTRIES:
+Very good - with how to provide credentials and such 
+- https://mesosphere.github.io/marathon/docs/native-docker-private-registry.html
+Pulling from private registries (also in the context of Kubernetes) 
+- https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+Creating - https://code-maze.com/docker-hub-vs-creating-docker-registry/
 
 TBD:
 EE, SHIM ETC - https://blogs.oracle.com/linux/dtrace-a-docker-container

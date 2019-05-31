@@ -24,9 +24,17 @@ https://medium.com/@wso2tech/configure-local-kubectl-to-access-remote-kubernetes
 
 Helm -
 https://medium.com/google-cloud/kubernetes-and-helm-create-your-own-helm-chart-5f54aed894c2
+https://medium.com/@anandpr/helm-and-tiller-steer-away-4ec4d5782081
 
 https://blog.depado.eu/post/ci-cd-with-drone-kubernetes-and-helm-1 (READ THIS)
 https://blog.depado.eu/post/ci-cd-with-drone-kubernetes-and-helm-2 (READ THIS)
+
+Helm without tiller -
+https://jenkins-x.io/news/helm-without-tiller/
+https://blog.giantswarm.io/what-you-yaml-is-what-you-get/
+
+Helm secuirty -
+https://engineering.bitnami.com/articles/helm-security.html
 
 -->
   Setup an HA kubernetes cluster on Bare Metal
@@ -54,7 +62,8 @@ https://linuxacademy.com/linux/training/lesson/course/certified-kubernetes-admin
 
 Ubuntu based: (custom)
 https://apassionatechie.wordpress.com/2017/11/28/kubernetes-from-scratch-on-ubuntu-16-04/
-https://icicimov.github.io/blog/kubernetes/Kubernetes-cluster-step-by-step-Part4/
+https://icicimov.github.io/blog/kubernetes/Kubernetes-cluster-step-by-step/
+- https://icicimov.github.io/blog/kubernetes/Kubernetes-cluster-step-by-step-Part4/
 
 Centos: (simple ones)
 https://www.techrepublic.com/article/how-to-install-a-kubernetes-cluster-on-centos-7/  (used for setting up first time)
@@ -82,7 +91,25 @@ https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
 Kubelet config file:
 https://github.com/kelseyhightower/kubernetes-the-hard-way/blob/master/docs/05-kubernetes-configuration-files.md
 
-----GOOD ONES (for setup)
+----TUTORIALS - GOOD ONES (for setup) INSTALL CONFIG 
+
+https://blog.inkubate.io/deploy-kubernetes-1-9-from-scratch-on-vmware-vsphere/
+--> on VMs, separated services - like in companies
+
+https://joshrendek.com/2018/04/kubernetes-on-bare-metal/
+--> very very good - covers helm, nfs etc
+
+https://www.itzgeek.com/how-tos/linux/centos-how-tos/how-to-install-kubernetes-on-centos-7-ubuntu-18-04-16-04-debian-9.html
+--> with 'Wave' pod network, kubeadm init method
+
+https://www.edureka.co/blog/install-kubernetes-on-ubuntu
+--> on ubuntu, kubeadm init method
+
+https://medium.com/@hashithkarunarathne/create-a-kubernetes-cluster-from-the-scratch-on-centos-7-rhel-7-and-deploy-an-application-on-85a92997b565
+--> kubeadm init method
+
+https://docs.microsoft.com/en-us/virtualization/windowscontainers/kubernetes/creating-a-linux-master
+--> kubeadm init method
 
 With flannel, centos (being used for round 2 POC)
   https://www.techrepublic.com/article/how-to-install-a-kubernetes-cluster-on-centos-7/
@@ -158,6 +185,9 @@ https://docs.docker.com/engine/reference/commandline/load/
 SERVICES
 how to access a service: https://kubernetes.io/docs/concepts/services-networking/connect-applications-service/
 Network Policy: https://kubernetes.io/docs/tasks/administer-cluster/declare-network-policy/
+Good one on services: http://alesnosek.com/blog/2017/02/14/accessing-kubernetes-pods-from-outside-of-the-cluster/
+Good one on services: https://www.cloudtechnologyexperts.com/how-to-create-a-kubernetes-service/
+port, target-port and nodeport explained: https://vitalflux.com/kubernetes-port-targetport-and-nodeport/
 
 CoreDNS for service discovery:
   https://kubernetes.io/docs/tasks/administer-cluster/coredns/
@@ -166,6 +196,9 @@ CoreDNS for service discovery:
 CoreDNS
 https://coredns.io/plugins/kubernetes/
 https://coredns.io/plugins/health/
+
+Multi-container pods:
+https://kubernetes.io/docs/tasks/access-application-cluster/communicate-containers-same-pod-shared-volume/
 
 OTHER
 
@@ -284,6 +317,7 @@ OFFICIAL DOCS
 Install & configure single-master-cluster:
 https://kubernetes.io/docs/setup/independent/install-kubeadm/
 https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/
+https://kubernetes.io/docs/setup/certificates/
 
 Administration:
 https://kubernetes.io/docs/tasks/
@@ -303,12 +337,26 @@ https://devcentral.f5.com/articles/calico-kubernetes-and-big-ip-26850
 ETCD
 ------
 https://coreos.com/etcd/docs/latest/op-guide/runtime-configuration.html
+
 https://github.com/etcd-io/etcd/tree/master/etcdctl
+
 https://github.com/etcd-io/etcd/blob/master/Documentation/op-guide/security.md  --> ETCD security, keys, certs
+https://coreos.com/etcd/docs/latest/v2/security.html --> ETCD security, keys, certs
 https://coreos.com/etcd/docs/latest/op-guide/security.html --> ETCD security, keys, certs, auto-tls
+
 https://coreos.com/etcd/docs/latest/etcd-live-http-to-https-migration.html --> ETCD security, keys, certs
 https://pcocc.readthedocs.io/en/latest/deps/etcd-production.html --> ETCD security, generate CA cert also
 https://github.com/etcd-io/etcd/issues/7930 -->TLS 2380 issue
 
 https://gist.github.com/Soarez/9688998 --> creating own CA certificate
 https://deliciousbrains.com/ssl-certificate-authority-for-local-https-development/ --> creating own CA certificate
+
+=====
+TOOLS
+=====
+https://thenewstack.io/klusterkit-combines-3-open-source-tools-for-managing-kubernetes/
+
+==============================
+RUNNING APPLICATIONS ON K8S
+==============================
+HAPROXY on K8s: https://www.bluematador.com/blog/running-haproxy-docker-containers-kubernetes
