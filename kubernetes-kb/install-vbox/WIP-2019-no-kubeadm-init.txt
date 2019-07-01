@@ -2,13 +2,56 @@
 INSTALL NOT WITH KUBEADM INIT
 ==============================
 
+NOTE: THIS IS NOW BEING DONE UNDER WIP-install-as-pods-separately.txt
+-- DONT DELETE THIS FILE - THIS IS A REFERENCE OR TBD AGAIN LATER
+
 Reference: WIP-install-baremetal-seprate-vms.txt
 
-To set up like in companies:
+Use this: https://medium.com/containerum/4-ways-to-bootstrap-a-kubernetes-cluster-de0d5150a1e4
+(multiple methods - binaries, docker images, kubeadm)
+
 https://blog.inkubate.io/deploy-kubernetes-1-9-from-scratch-on-vmware-vsphere/
+And, to set up like in companies: (this still uses binaries - not docker containers for components)
+
+With docker images:
+ETCD with docker images - https://coreos.com/etcd/docs/latest/v2/docker_guide.html
 
 For repo setup and some stuff (this uses kubeadm init):
 https://www.itzgeek.com/how-tos/linux/centos-how-tos/how-to-install-kubernetes-on-centos-7-ubuntu-18-04-16-04-debian-9.html
+
+
+============================
+HOW IT WORKS
+============================
+NOTE: Here we are NOT discussing how to make it multi-node etcd and multi-master cluster
+
+Set up ETCD - docker image and etcd service
+Configure core manifests and addon configurations as given below
+Run bootstrap script or service, which wll:
+  Start etcd
+  Start kubelet (it starts kubelet and also creates apiserver, controller manager and scheduler pods)
+  Start addons (kubectl apply)
+
+rootfs/etc/systemd/system/etcd.service
+--> calls /opt/k8s/start-etcd.sh
+
+/etc/systemd/system/k8s-bootstrap.service
+--> calls /opt/k8s/k8s-bootstrap.sh
+
+During machine start, the bootstrap script called via the service: 
+/opt/k8s/k8s-bootstrap.sh
+--> Starts kubelet (which starts apiserver and such)
+  /etc/kubernetes/manifests  --> CORE MANIFESTS
+    kube-apiserver.json
+    kube-controller-manager.json
+    kube-scheduler.json
+--> Starts addons
+  /etc/kubernetes/addons/  --> ADDONS
+    flannel.yml (or calico)
+    kube-dns.yml
+    kube-proxy.yml
+    nginx-ingress-controller.yml
+    stores-umtrx-agent.yml
 
 ============================================================
 PREPARE MODEL VM - TO CLONE INTO MASTER, ETCD, WORKER VMs
@@ -177,7 +220,7 @@ MASTER
 THESE ARE THE IMAGES NEEDED
 
 REPOSITORY                                                            TAG                 IMAGE ID            CREATED             SIZE
-docker.target.com/kubernetes/namespace-token-distributer-controller   1.4.4               cf86f24fc729        40 hours ago        468MB
+docker.x.com/kubernetes/namespace-token-distributer-controller   1.4.4               cf86f24fc729        40 hours ago        468MB
 gcr.io/google_containers/kube-proxy-amd64                             v1.12.6             211cc719d4d6        7 weeks ago         96.5MB
 gcr.io/google_containers/kube-controller-manager-amd64                v1.12.6             473237e54d99        7 weeks ago         164MB
 gcr.io/google_containers/kube-apiserver-amd64                         v1.12.6             97d5a4fe6d07        7 weeks ago         194MB

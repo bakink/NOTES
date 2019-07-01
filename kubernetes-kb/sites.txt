@@ -36,7 +36,11 @@ https://blog.giantswarm.io/what-you-yaml-is-what-you-get/
 Helm secuirty -
 https://engineering.bitnami.com/articles/helm-security.html
 
--->
+KUBERNETES INSTALL/CONFIG - HA
+
+  Concept explained:
+  https://elastisys.com/2018/01/25/setting-highly-available-kubernetes-clusters/
+  
   Setup an HA kubernetes cluster on Bare Metal
   https://github.com/salmanb/Kubernetes-HA-on-baremetal
   
@@ -53,7 +57,7 @@ https://engineering.bitnami.com/articles/helm-security.html
   https://www.youtube.com/watch?v=ppY9cqTvBVE
 
 ====================================
-CORE ONES USED IN THE BEGINNING
+KUBERNETES INSTALL/CONFIG - CORE ONES USED IN THE BEGINNING
 
 Ubuntu based:
 https://blog.alexellis.io/kubernetes-in-10-minutes/
@@ -87,15 +91,35 @@ http://containertutorials.com/get_started_kubernetes/k8s_example.html
 https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
 ====================================
 
+KUBERNETES INSTALL/CONFIG
 
 Kubelet config file:
 https://github.com/kelseyhightower/kubernetes-the-hard-way/blob/master/docs/05-kubernetes-configuration-files.md
 
 ----TUTORIALS - GOOD ONES (for setup) INSTALL CONFIG 
 
-https://blog.inkubate.io/deploy-kubernetes-1-9-from-scratch-on-vmware-vsphere/
---> on VMs, separated services - like in companies
+- DIFFERENT INSTALL/BOOTSTRAP METHODS DESCRIBED
+https://medium.com/containerum/4-ways-to-bootstrap-a-kubernetes-cluster-de0d5150a1e4
+(binaries, docker images, kubeadm)
+(references https://github.com/kelseyhightower/kubernetes-the-hard-way)
 
+- WITH DOCKER IMAGES
+ETCD with etcd docker images:
+ETCD with docker images - https://coreos.com/etcd/docs/latest/v2/docker_guide.html
+
+- WITH BINARY INSTALLS
+https://github.com/kelseyhightower/kubernetes-the-hard-way
+--> Very good with binary installs (but WITH BINARIES - NOT WITH PODS
+
+https://blog.inkubate.io/deploy-kubernetes-1-9-from-scratch-on-vmware-vsphere/
+--> on VMs (using binary installs - not docker images), separated services - AS IN COMPANIES
+--> NOW I AM ADAPTING THIS FOR POD BASED INSTALLS - 3 NODE)
+--> multiple master nodes
+
+https://www.digitalocean.com/community/tutorials/how-to-install-and-configure-kubernetes-on-top-of-a-coreos-cluster
+--> Setup everything manually (on CoreOS) - with binary installs
+
+- OTHERS
 https://joshrendek.com/2018/04/kubernetes-on-bare-metal/
 --> very very good - covers helm, nfs etc
 
@@ -132,8 +156,6 @@ https://geraldonit.com/2018/03/26/deploying-a-kubernetes-cluster-with-vagrant-on
 With weavenet, ubuntu
 https://www.gremlin.com/community/tutorials/how-to-create-a-kubernetes-cluster-on-ubuntu-16-04-with-kubeadm-and-weave-net/
 
-Setup everything manually (on CoreOS)
-https://www.digitalocean.com/community/tutorials/how-to-install-and-configure-kubernetes-on-top-of-a-coreos-cluster
 
 KUBERNETES SETUP
 

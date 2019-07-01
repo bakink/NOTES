@@ -2,35 +2,107 @@
 INSTALL AS PODS - SEPARATELY INSTALL EACH POD - NOT WITH INIT
 ==================================================================
 
+REFERENCE: WIP-2019-no-kubeadm-init.txt
 
-redo this whole thing - redo this - changing CIDR to something different from VM IPs
-(SEE CALICO NOTES FILE)
+=======================
+DOCS TO USE
+=======================
+https://medium.com/containerum/4-ways-to-bootstrap-a-kubernetes-cluster-de0d5150a1e4
+--> Includes setting up using images in 'Option 2 - self hosted'
 
+https://github.com/etcd-io/etcd/blob/master/Documentation/op-guide/container.md
+  (old doc https://coreos.com/etcd/docs/latest/v2/docker_guide.html)
+--> ETCD with docker images
+(ETCD Config - https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/)
+(for ETCD certificates - https://blog.inkubate.io/deploy-kubernetes-1-9-from-scratch-on-vmware-vsphere/)
 
+Also, another ETCD docker document:
+https://github.com/etcd-io/etcd/blob/master/Documentation/op-guide/clustering.md
+https://github.com/etcd-io/etcd/blob/master/Documentation/op-guide/clustering.md#static
 
+https://github.com/kelseyhightower/kubernetes-the-hard-way
+--> Very good with binary installs (AS IN COMPANIES)
 
+https://blog.inkubate.io/deploy-kubernetes-1-9-from-scratch-on-vmware-vsphere/
+--> Very good with binary installs (AS IN COMPANIES - NOW I AM ADAPTING THIS FOR POD BASED INSTALLS - 3 NODE)
+--> on VMs (using binary installs - not docker images), separated services - like in companies
+--> multiple master nodes
 
+=======================
+WHAT ALL TO INSTALL
+=======================
 
-MACHINE- K1
+kubelet
+kubedam
+kubectl
 
 ETCD
 MASTER
 WORKER
 FLANNEL/CALICO
 
+=======================
+CIDRS
+=======================
+
+------------------------------------------------------------
+CIDR FOR PODS - IS DEFINED IN CONTROLLER-MANAGER MANIFEST
+------------------------------------------------------------
+https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/
+
+NOTE: This is the "--pod-network-cidr=172.16.0.0/16" in kubeadm init method
+(also see https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/)
+
+--cluster-cidr string
+CIDR Range for Pods in cluster. Requires --allocate-node-cidrs to be true
+
+------------------------------------------------------------
+CIDR FOR SERVICS - IS DEFINED IN APISERVER MANIFEST
+------------------------------------------------------------
+https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/
+
+NOTE: This is the "--service-cidr string" in kubeadm init method
+(also see https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/)
+
+--service-cluster-ip-range ipNet     Default: 10.0.0.0/24
+A CIDR notation IP range from which to assign service cluster IPs. This must not overlap with any IP ranges assigned to nodes for pods.
+
+------------------------------------------------------------
+CAUTION (from some past learning)
+------------------------------------------------------------
+What is this ?????
+ redo this whole thing - redo this - changing CIDR to something different from VM IPs
+ (SEE CALICO NOTES FILE)
+
 =================
 INITIAL VM SETUP
 =================
----------------------------------
-HOSTNAME AND IP SETUP
----------------------------------
+
+-----------
+MACHINES
+-----------
+K0 - HA Proxy for master
+K1, K2, K3 - etcd, master, worker - all in one
+
+----------------------
+IP ADDRESSES
+----------------------
+K0 - 192.168.40.100
+K1 - 192.168.40.101
+K2 - 192.168.40.102
+K3 - 192.168.40.103
+
+What is this note??
 For Kubernetes: (set IPs matching this or vice-versa)
 NOTE: Changing cidr to 192.168.0.0 (instead of 192.168.11.0 as directed in main web article)
 --apiserver-advertise-address=192.168.11.200 --pod-network-cidr=192.168.0.0/16
 
+---------------------------------
+HOSTNAME AND IP SETUP
+---------------------------------
+
 # hostnamectl set-hostname kubemaster0
-Set IP for = enp0s8 172.168.1.101 netmask 255.255.255.0
-Set IP for = enp0s9 192.168.1.101 netmask 255.255.255.0
+Set IP for = enp0s8 182.168.10.101 netmask 255.255.255.0
 
 Add main IP to /etc/hosts
 127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
@@ -43,7 +115,6 @@ Add main IP to /etc/hosts
 Restart the machine and ensure hostname and IPs show up.
 # hostname
 # ifconfig enp0s8
-# ifconfig enp0s9
 
 ---------------------------------
 DISABLE SELINUX
@@ -101,15 +172,84 @@ Install Docker-ce with the command:
 # docker info | grep -i cgroup
 Cgroup Driver: cgroupfs
 
+----------------------------------------
+INSTALL CFSSL - TO GENERATE CERTIFICATES
+----------------------------------------
+https://blog.inkubate.io/deploy-kubernetes-1-9-from-scratch-on-vmware-vsphere/
+
+Installation of cfssl
+1- Download the binaries.
+
+$ wget https://pkg.cfssl.org/R1.2/cfssl_linux-amd64
+$ wget https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
+2- Add the execution permission to the binaries.
+
+$ chmod +x cfssl*
+3- Move the binaries to /usr/local/bin.
+
+$ sudo mv cfssl_linux-amd64 /usr/local/bin/cfssl
+$ sudo mv cfssljson_linux-amd64 /usr/local/bin/cfssljson
+4- Verify the installation.
+
+$ cfssl version
+
+-----------------------------------
+FIREWALL - FOR MASTER NODES
+-----------------------------------
+firewall-cmd --permanent --add-port=6443/tcp
+firewall-cmd --permanent --add-port=2379-2380/tcp
+firewall-cmd --permanent --add-port=10250/tcp
+firewall-cmd --permanent --add-port=10251/tcp
+firewall-cmd --permanent --add-port=10252/tcp
+firewall-cmd --permanent --add-port=10255/tcp
+firewall-cmd --reload
+
+-----------------------------------
+FIREWALL - FOR WORKER NODES
+-----------------------------------
+firewall-cmd --permanent --add-port=10251/tcp
+firewall-cmd --permanent --add-port=10255/tcp
+firewall-cmd --reload
+
+==========================================
+INSTALL KUBEADM, KUBELET, KUBECTL
+==========================================
+https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/
+
+NOTE: Ensure you install the correct versions for the versions of apiserver and such that you install
+# yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes
+
 ==========================================
 PULL DOCKER IMAGES NEEDED FOR KUBERNETES
 ==========================================
 
 - ETCD
-# docker pull quay.io/coreos/etcd
+# docker pull quay.io/coreos/etcd:latest
+or
+# docker pull quay.io/coreos/etcd:v3.3
 
 - MASTER (with additional components for workers also)
 --- FOR SPECIFIC VERSIONS
+https://kubernetes.io/docs/setup/release/notes/
+gcr.io/google_containers/kube-proxy-amd64(and such)
+
+docker pull gcr.io/google_containers/kube-apiserver-amd64:v1.15.0
+docker pull gcr.io/google_containers/kube-scheduler-amd64:v1.15.0 
+docker pull gcr.io/google_containers/kube-controller-manager-amd64:v1.15.0 
+docker pull gcr.io/google_containers/kube-proxy-amd64:v1.15.0 
+docker pull gcr.io/google-containers/kube-addon-manager-amd64:v9.0.1  (gcr.io/google_containers/kube-proxy-amd64)
+docker pull gcr.io/google_containers/metrics-server-amd64:v0.3.3 
+docker pull gcr.io/google-containers/rescheduler:v0.4.0 (is there a later one)
+docker pull quay.io/calico/node:v3.8.0 (or 3.8 ?) (https://hub.docker.com/r/calico/node/tags)
+docker pull quay.io/calico/cni:v3.5.0 (or 3.5?) (https://hub.docker.com/r/calico/cni/tags)
+docker pull k8s.gcr.io/pause-amd64:3.1 (https://console.cloud.google.com/gcr/images/google-containers/GLOBAL/pause-amd64?gcrImageListsize=30)
+docker pull coredns/coredns
+
+# Add this to make a common image for master and woker
+docker pull quay.io/jcmoraisjr/haproxy-ingress:v0.7.2
+
+
+--- FOR SPECIFIC VERSIONS (older)
 docker pull gcr.io/google_containers/kube-apiserver-amd64:v1.12.4 
 docker pull gcr.io/google_containers/kube-scheduler-amd64:v1.12.4 
 docker pull gcr.io/google_containers/kube-controller-manager-amd64:v1.12.4 
@@ -136,6 +276,7 @@ docker pull quay.io/calico/cni
 docker pull k8s.gcr.io/pause-amd64
 # Add this to make a common image for master and woker
 docker pull quay.io/jcmoraisjr/haproxy-ingress
+docker pull coredns/coredns
 
 - WORKER ONLY
 --- FOR SPECIFIC VERSIONS
@@ -157,16 +298,175 @@ docker pull quay.io/calico/cni
 =======
 ETCD
 =======
-- HIGH LEVEL STEPS
+https://github.com/etcd-io/etcd/blob/master/Documentation/op-guide/container.md
+  (old doc https://coreos.com/etcd/docs/latest/v2/docker_guide.html)
+------------------
+HIGH LEVEL STEPS
+------------------
 Pull image as mentioned earlier.
 Create an etcd service with IP settings.
 Start the service so that it starts etcd image as container with correct settings.
+
+------------------
+STEPS
+------------------
+REGISTRY=quay.io/coreos/etcd
+# available from v3.2.5
+#REGISTRY=gcr.io/etcd-development/etcd
+
+# For each machine
+#ETCD_VERSION=latest
+ETCD_VERSION=v3.3
+# Note: TOKEN can be any string
+TOKEN=my-etcd-token
+CLUSTER_STATE=new
+NAME_1=k1
+NAME_2=k2
+NAME_3=k3
+HOST_1=192.168.40.101
+HOST_2=192.168.40.102
+HOST_3=192.168.40.103
+CLUSTER=${NAME_1}=http://${HOST_1}:2380,${NAME_2}=http://${HOST_2}:2380,${NAME_3}=http://${HOST_3}:2380
+DATA_DIR=/var/lib/etcd
+
+# For node 1
+THIS_NAME=${NAME_1}
+THIS_IP=${HOST_1}
+#docker run \
+docker run --rm\
+  --net=host
+  -p 2379:2379 \
+  -p 2380:2380 \
+  --volume=${DATA_DIR}:/etcd-data \
+  --name etcd ${REGISTRY}:${ETCD_VERSION} \
+  /usr/local/bin/etcd \
+  --data-dir=/etcd-data --name ${THIS_NAME} \
+  --initial-advertise-peer-urls http://${THIS_IP}:2380 --listen-peer-urls http://0.0.0.0:2380 \
+  --advertise-client-urls http://${THIS_IP}:2379 --listen-client-urls http://0.0.0.0:2379 \
+  --initial-cluster ${CLUSTER} \
+  --initial-cluster-state ${CLUSTER_STATE} --initial-cluster-token ${TOKEN}
+
+# For node 2
+THIS_NAME=${NAME_2}
+THIS_IP=${HOST_2}
+#docker run \
+docker run --rm\
+  --net=host
+  -p 2379:2379 \
+  -p 2380:2380 \
+  --volume=${DATA_DIR}:/etcd-data \
+  --name etcd ${REGISTRY}:${ETCD_VERSION} \
+  /usr/local/bin/etcd \
+  --data-dir=/etcd-data --name ${THIS_NAME} \
+  --initial-advertise-peer-urls http://${THIS_IP}:2380 --listen-peer-urls http://0.0.0.0:2380 \
+  --advertise-client-urls http://${THIS_IP}:2379 --listen-client-urls http://0.0.0.0:2379 \
+  --initial-cluster ${CLUSTER} \
+  --initial-cluster-state ${CLUSTER_STATE} --initial-cluster-token ${TOKEN}
+
+# For node 3
+THIS_NAME=${NAME_3}
+THIS_IP=${HOST_3}
+#docker run \
+docker run --rm\
+  --net=host
+  -p 2379:2379 \
+  -p 2380:2380 \
+  --volume=${DATA_DIR}:/etcd-data \
+  --name etcd ${REGISTRY}:${ETCD_VERSION} \
+  /usr/local/bin/etcd \
+  --data-dir=/etcd-data --name ${THIS_NAME} \
+  --initial-advertise-peer-urls http://${THIS_IP}:2380 --listen-peer-urls http://0.0.0.0:2380 \
+  --advertise-client-urls http://${THIS_IP}:2379 --listen-client-urls http://0.0.0.0:2379 \
+  --initial-cluster ${CLUSTER} \
+  --initial-cluster-state ${CLUSTER_STATE} --initial-cluster-token ${TOKEN}
+  
+- VERIFY
+docker exec etcd /bin/sh -c "export ETCDCTL_API=3 && /usr/local/bin/etcdctl member list"
+  [root@k1 kube]# docker exec etcd /bin/sh -c "export ETCDCTL_API=3 && /usr/local/bin/etcdctl member list"
+  1e7c8c4eb9920d9d, started, k1, http://192.168.40.101:2380, http://192.168.40.101:2379
+  a336890e0c77f3f6, started, k3, http://192.168.40.103:2380, http://192.168.40.103:2379
+  f0103422c3d66497, started, k2, http://192.168.40.102:2380, http://192.168.40.102:2379
+
+docker exec etcd /bin/sh -c "export ETCDCTL_API=3 && /usr/local/bin/etcdctl put foo bar"
+  [root@k1 etcd]# docker exec etcd /bin/sh -c "export ETCDCTL_API=3 && /usr/local/bin/etcdctl put foo bar"
+  OK
+  [root@k1 etcd]# docker exec etcd /bin/sh -c "export ETCDCTL_API=3 && /usr/local/bin/etcdctl get foo"
+  foo
+  bar
 
 --------------
 ETCD SERVICE
 --------------
 To start etcd container when host machine starts - create a systemd service.
 
+----
+File: /etc/environment
+----
+# ETCD RELATED ENVIRONMENT
+REGISTRY=quay.io/coreos/etcd
+# available from v3.2.5
+#REGISTRY=gcr.io/etcd-development/etcd
+
+# For each machine
+#ETCD_VERSION=latest
+ETCD_VERSION=v3.3
+# Note: TOKEN can be any string
+TOKEN=my-etcd-token
+CLUSTER_STATE=new
+CLUSTER="k1=http://192.168.40.101:2380,k2=http://192.168.40.102:2380,k3=http://192.168.40.103:2380"
+DATA_DIR=/var/lib/etcd
+THIS_NAME=k1
+THIS_IP=192.168.40.101
+
+
+----
+File: /etc/systemd/system/etcd.service:
+----
+[Unit]
+Description=etcd
+Documentation=https://github.com/coreos
+Wants=docker.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+IOSchedulingClass=2
+IOSchedulingPriority=0
+EnvironmentFile=/etc/environment
+
+# START ETCD
+ExecStart=/usr/bin/docker run --rm\
+  --net=host \
+  -p 2379:2379 \
+  -p 2380:2380 \
+  --volume=${DATA_DIR}:/etcd-data \
+  --name etcd ${REGISTRY}:${ETCD_VERSION} \
+  /usr/local/bin/etcd \
+  --data-dir=/etcd-data --name ${THIS_NAME} \
+  --initial-advertise-peer-urls http://${THIS_IP}:2380 --listen-peer-urls http://0.0.0.0:2380 \
+  --advertise-client-urls http://${THIS_IP}:2379 --listen-client-urls http://0.0.0.0:2379 \
+  --initial-cluster ${CLUSTER} \
+  --initial-cluster-state ${CLUSTER_STATE} --initial-cluster-token ${TOKEN}
+
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+
+
+- NOW, START ETCD SERVICE
+-- Reload the daemon configuration.
+systemctl daemon-reload
+
+-- Enable etcd to start at boot time.
+systemctl enable etcd
+
+-- Start etcd.
+systemctl start etcd
+
+--  REFERENCE COMMAND BELOW
 Reference docker command to start the container with settings:
 NOTE: The IP address 101.192.217.105 and other such of the hosts - not of the container.
 
