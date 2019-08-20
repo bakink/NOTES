@@ -1,3 +1,47 @@
+DISCOURSE
+https://blog.openshift.com/kubernetes-deep-dive-api-server-part-2/ - many things
+https://dev.to/chuck_ha/reading-kubernetes-logs-315k - Reading logs 
+
+
+- - - - - - - - - - - - - - - - - 
+NOW USING:
+https://medium.com/containerum/4-ways-to-bootstrap-a-kubernetes-cluster-de0d5150a1e4
+https://blog.inkubate.io/deploy-kubernetes-1-9-from-scratch-on-vmware-vsphere/
+https://www.ibm.com/support/knowledgecenter/en/SSMNED_5.0.0/com.ibm.apic.install.doc/tapic_install_Kubernetes.html
+(similar to https://blog.inkubate.io/deploy-kubernetes-1-9-from-scratch-on-vmware-vsphere/)
+
+Another one - multimaster with kubeadm: 
+- https://blog.inkubate.io/install-and-configure-a-multi-master-kubernetes-cluster-with-kubeadm/
+
+- - - - - - - - - - - - - - - - - 
+
+*** OFFICIAL DOCS **** (as of Aug 2019)
+
+ADMINISTRATION / TASKS:
+https://kubernetes.io/docs/tasks/
+https://kubernetes.io/docs/tasks/administer-cluster
+
+CONCEPTS:
+https://kubernetes.io/docs/concepts/
+
+HA TOPOLOGY:
+https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/ha-topology/
+
+CLUSTER SETUP:
+https://kubernetes.io/docs/setup/  (uses kubeadm init)
+
+KUBELET:
+https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/kubelet-integration/
+https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/
+https://kubernetes.io/docs/tasks/administer-cluster/kubelet-config-file/
+
+REFERENCE:
+https://kubernetes.io/docs/reference/
+https://kubernetes.io/docs/reference/command-line-tools-reference/
+https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/
+
+
+- - - - - - -  --  - --  - -
 MUST TRY:
 https://github.com/kelseyhightower/kubernetes-the-hard-way/tree/master/docs
 
@@ -38,6 +82,18 @@ https://engineering.bitnami.com/articles/helm-security.html
 
 KUBERNETES INSTALL/CONFIG - HA
 
+CONFIGMAP
+https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap
+https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#create-configmaps-from-directories
+https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#create-configmaps-from-files
+https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#create-configmaps-from-literal-values
+https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#add-configmap-data-to-a-volume
+  (also https://kubernetes.io/docs/concepts/storage/volumes/#configmap)
+https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#define-container-environment-variables-using-configmap-data
+  
+
+
+
   Concept explained:
   https://elastisys.com/2018/01/25/setting-highly-available-kubernetes-clusters/
   
@@ -74,6 +130,7 @@ https://www.techrepublic.com/article/how-to-install-a-kubernetes-cluster-on-cent
 https://linuxthegreat.wordpress.com/2017/10/17/installing-kubernetes-1-8-1-on-centos-7/ (used for setting up first time)
 https://www.howtoforge.com/tutorial/centos-kubernetes-docker-cluster/
 https://www.linuxtechi.com/install-kubernetes-1-7-centos7-rhel7/
+https://randomopenstackthoughts.wordpress.com/2019/01/26/install-kubernetes-v1-13-with-docker-18-06-on-centos-7/
 
 General:
 https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/
@@ -372,6 +429,12 @@ https://github.com/etcd-io/etcd/issues/7930 -->TLS 2380 issue
 
 https://gist.github.com/Soarez/9688998 --> creating own CA certificate
 https://deliciousbrains.com/ssl-certificate-authority-for-local-https-development/ --> creating own CA certificate
+
+------------------
+ETCD - QUERY DATA
+------------------
+https://stackoverflow.com/questions/47807892/how-to-access-kubernetes-keys-in-etcd --> kubernetes data
+https://github.com/kubernetes/kubernetes/issues/55850 --> in python
 
 =====
 TOOLS
