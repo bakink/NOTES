@@ -222,3 +222,10 @@ USE VAULT IN THE CODE
 =======================
 chef_gem("chef-vault")
 vault_data = ChefVault::Item.load(data_bag_name, item_name)
+
+==============================
+VAULT ENCRYPTING FOR NODES
+==============================
+knife vault update out Nessus-agent -J Nessus.json -C “node-name”
+knife vault update out Nessus-agent -J Nessus.json -S “*.*”
+knife vault show ost nessus-agent -F json -p all

@@ -6,12 +6,20 @@ https://medium.com/containerum/4-ways-to-bootstrap-a-kubernetes-cluster-de0d5150
 https://blog.inkubate.io/deploy-kubernetes-1-9-from-scratch-on-vmware-vsphere/
 https://www.ibm.com/support/knowledgecenter/en/SSMNED_5.0.0/com.ibm.apic.install.doc/tapic_install_Kubernetes.html
 
+etcd as container - https://github.com/etcd-io/etcd/blob/master/Documentation/op-guide/container.md --> ETCD wit containers
+etcd security - https://github.com/etcd-io/etcd/blob/master/Documentation/op-guide/security.md  --> ETCD security, keys, certs
+
 apiserver as pod - https://github.com/kubernetes/kubeadm/issues/522
 apiserver as pod - https://github.com/kubernetes/kubernetes/issues/63899
+https://github.com/kubernetes/kubernetes/issues/51881
 kubeconfig file - https://stackoverflow.com/questions/31137692/how-to-let-kubelet-communicate-with-apiserver-by-using-https-v0-19/31285674
 certificate issue - https://stackoverflow.com/questions/46360361/invalid-x509-certificate-for-kubernetes-master
 certificate creation - https://kubernetes.io/docs/concepts/cluster-administration/certificates/
 certificate san -  https://kubernetes.io/docs/setup/best-practices/certificates/
+
+flannel certificate issue: 
+https://www.reddit.com/r/kubernetes/comments/8qkxmm/installing_flannel_in_kubernetes_cluster_chicken/
+https://github.com/coreos/flannel/blob/master/Documentation/configuration.md
 
 api access failing -  https://stackoverflow.com/questions/34306082/kubernetes-https-api-return-unauthorized
 
@@ -30,6 +38,15 @@ Option 2: self-hosted
 This option is very similar to the previous one but instead of downloading binaries and running them in systemd, we will use container images with those components. Self-hosted means that we only launch kubelet binary in systemd. When it is running, it searches for manifests in /etc/kubernetes/manifests directory (where we will put the rest of components) and launches them in containers.
 First add the following flag to kubelet config: --pod-manifest-path=/etc/kubernetes/manifests
 
+===================================
+ABOUT POD IP ADDRESSES
+===================================
+These will run under host/vm IP address 
+- not the IP given by overlay networker like flannel/calico (or docker in the absence of flannel/calico
+- kube-apiserver, kube-controller-manager, kube-scheduler, kube-proxy, flannel/calico
+
+Overlay/Docker IP are given to all other pods (maybe there are some exceptions)
+
 =====================
 ESSENTIAL COMPONENTS
 =====================
@@ -41,10 +58,24 @@ kube-apiserver
 kube-scheduler
 kube-controller-manager
 
+
 - WORKER (aka NODE)
 kubelet
 kube-proxy
 kube-dns (or coredns) --> this is a pod which can have X number of replicas
+flannel
+
+=====================
+SEQUENCE
+=====================
+Install kubectl,kubelet, kubeadm
+Create certificates and kubeconfig files
+Create service files for etcd and kubelet
+Start ETCD
+Start kubelet - which will start apiserver, scheduler, controller-manager (first create their manifests & kubeconfig files)
+Start flannel (first, create flannel addon manifest)
+Start kube-proxy (first, create kube-proxy addon manifest)
+Start kube-dns (first, create kube-dns addon manifest)
 
 ======
 VMs
@@ -188,6 +219,9 @@ users:
 ------------------------------------------------------------------------------------
 /etc/kubernetes/manifests/kube-apiserver.yaml:
 ------------------------------------------------------------------------------------
+NOTE:  "SecurityContextDeny" was removed from the following line - as it was disallowing kube-dns pod from creating
+        - --admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+	
 apiVersion: v1
 kind: Pod
 metadata:
@@ -208,7 +242,7 @@ spec:
     - --bind-address=0.0.0.0
     - --etcd-servers=http://192.168.60.101:2379
     - --service-cluster-ip-range=10.96.0.0/12
-    - --admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+    - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota
     image: gcr.io/google_containers/kube-apiserver-amd64:v1.12.8
     name: kube-apiserver
 
@@ -334,7 +368,18 @@ Installing kubelet also will install a couple of service files:
 /usr/lib/systemd/system/kubelet.service
 --> which references indirectly this - /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
 
+
+NOTE: IMPORTANT IMPORTANT - FOR FLANNEL
+If using flannel,
+1. Add this environment: (NOTE - ADD THIS AFTER YOU INSTALL FLANNEL, AND THEN RESTART KUBELET)
+Environment="KUBELET_NETWORK_ARGS=--network-plugin=cni --cni-conf-dir=/etc/cni/net.d --cni-bin-dir=/opt/cni/bin --node-ip=192.168.60.102"
+
+2. And in kubelet command in that file, reference that environment variable KUBELET_NETWORK_ARGS
+
+
+
 File: /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf:
+(this is without Flannel related stuff mentioned above)
 
 # Note: This dropin only works with kubeadm and kubelet v1.11+
 [Service]
@@ -345,6 +390,13 @@ File: /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf:
 #
 # -- added
 Environment="KUBELET_CONFIG_ARGS=--kubeconfig=/etc/kubernetes/kubelet-config.yaml --pod-manifest-path=/etc/kubernetes/manifests"
+#
+# -- added (NOTE - ADD THIS AFTER YOU INSTALL FLANNEL, AND THEN RESTART KUBELET)
+Environment="KUBELET_NETWORK_ARGS=--network-plugin=cni --cni-conf-dir=/etc/cni/net.d --cni-bin-dir=/opt/cni/bin --node-ip=192.168.8.11"
+#
+# -- added
+Environment="KUBELET_DNS_ARGS=--cluster-dns=10.96.0.10 --cluster-domain=cluster.local"
+
 
 # This is a file that "kubeadm init" and "kubeadm join" generates at runtime, populating the KUBELET_KUBEADM_ARGS variable dynamically
 EnvironmentFile=-/var/lib/kubelet/kubeadm-flags.env
@@ -352,13 +404,22 @@ EnvironmentFile=-/var/lib/kubelet/kubeadm-flags.env
 # the .NodeRegistration.KubeletExtraArgs object in the configuration files instead. KUBELET_EXTRA_ARGS should be sourced from this file.
 EnvironmentFile=-/etc/sysconfig/kubelet
 ExecStart=
-ExecStart=/usr/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS 
+ExecStart=/usr/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS $KUBELET_NETWORK_ARGS $KUBELET_DNS_ARGS
+
 
 ----------------
 START KUBELET
 ----------------
 # systemctl enable kubelet
 # systemctl start kubelet
+
+# journalctl -fu kubelet
+Sep 13 16:44:26 ks1 kubelet[32231]: E0913 16:44:26.785734   32231 kubelet.go:2236] node "ks1" not found
+Sep 13 16:44:26 ks1 kubelet[32231]: E0913 16:44:26.889511   32231 kubelet.go:2236] node "ks1" not found
+Sep 13 16:44:26 ks1 kubelet[32231]: E0913 16:44:26.991825   32231 kubelet.go:2236] node "ks1" not found
+Sep 13 16:44:27 ks1 kubelet[32231]: I0913 16:44:27.112401   32231 kubelet_node_status.go:73] Successfully registered node ks1
+Sep 13 16:44:27 ks1 kubelet[32231]: I0913 16:44:27.125928   32231 reconciler.go:154] Reconciler: start to sync state
+--> The last two lines indicate that kubelet/cluster have started fully
 
 - VERIFY
 # kubectl get pods --all-namespaces
@@ -371,7 +432,8 @@ kube-system   kube-scheduler-ks1            1/1     Running   0          8m50s
 ===================================
 CERTIFICATES
 ===================================
-Notes: 
+NOTE: Same certificates are used for ETCD and Kubernetes 
+NOTE: 
 - "--client-ca-file=/etc/kubernetes/pki/ca.pem" in kubelet is important
 - "--client-ca-file=/etc/kubernetes/pki/ca.pem" in kube-apiserver is important
 - The element 'ST' could be something like 'MyCompany Inc'
@@ -385,12 +447,12 @@ ca-config.json file:
 {
   "signing": {
     "default": {
-      "expiry": "8760h"
+      "expiry": "87600h"
     },
     "profiles": {
       "kubernetes": {
         "usages": ["signing", "key encipherment", "server auth", "client auth"],
-        "expiry": "8760h"
+        "expiry": "87600h"
       }
     }
   }
@@ -415,7 +477,7 @@ ca-csr.json file:
   ]
 }
 
-Run command: (gen.sh)
+Run command: (ca-gen.sh)
 
 cfssl gencert -initca ca-csr.json | cfssljson -bare ca
 
@@ -450,7 +512,7 @@ admin-csr.json file:
   ]
 }
 
-Run command: (gen-admin.sh)
+Run command: (admin-gen.sh)
 
 cfssl gencert \
 -ca=ca.pem \
@@ -568,12 +630,13 @@ kubernetes-csr.json file:
 
 Run command : (kubernetes-gen.sh)
 NOTE: hostname has IP and hostname (not just IP as in the web 'deploying...' example)
+NOTE: 10.96.0.1 is derived from pod-ip cidr - with 1 at the end - this is assigned to apiserver pod by default
 
 cfssl gencert \
 -ca=ca.pem \
 -ca-key=ca-key.pem \
 -config=ca-config.json \
--hostname=192.168.60.102,127.0.0.1,ks2,kubernetes.default \
+-hostname=10.96.0.1,192.168.60.102,127.0.0.1,ks2,kubernetes.default \
 -profile=kubernetes kubernetes-csr.json | \
 cfssljson -bare kubernetes
 
@@ -671,9 +734,25 @@ systemctl restart etcd
 # curl -k https://localhost:2379/health
 {"health": "true"}
 
+SOLVED (TBD): 'etcdctl' command is erroring out, though API works fine
+	[root@ksn1 system]# docker exec -ti etcd etcdctl member list
+	client: etcd cluster is unavailable or misconfigured; error #0: malformed HTTP response "\x15\x03\x01\x00\x02\x02"
+	; error #1: dial tcp 127.0.0.1:4001: getsockopt: connection refused
+
+# docker exec -ti etcd /bin/sh
+Now, inside the etcd container (note - /etc/kubernetes/pki of host is mounted on this container as done in etcd.service)
+~# cd /etc/kubernetes/pki
+/etc/kubernetes/pki # ETCDCTL_API=3 etcdctl --cacert=./ca.pem --cert=./kubernetes.pem --key=./kubernetes-key.pem member list
+--> OUTPUT IS OK:
+5b1fda1c3621a072, started, ksn1, https://192.168.8.11:2380, https://192.168.8.11:2379
+
+
 ----------------------
 kube-apiserver.yaml
 ----------------------
+NOTE: "SecurityContextDeny" was removed from the following line - as it was disallowing kube-dns pod from creating
+    - --admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+    
 apiVersion: v1
 kind: Pod
 metadata:
@@ -695,7 +774,7 @@ spec:
     - --bind-address=0.0.0.0
     - --etcd-servers=https://192.168.60.102:2379
     - --service-cluster-ip-range=10.96.0.0/12
-    - --admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+    - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota
     - --client-ca-file=/etc/kubernetes/pki/ca.pem
     - --etcd-cafile=/etc/kubernetes/pki/ca.pem 
     - --etcd-certfile=/etc/kubernetes/pki/kubernetes.pem 
@@ -787,6 +866,18 @@ systemctl start etcd
 systemctl start kubelet
 
 ------------------
+VERIFY
+------------------
+NOTE: IP of these pods are of the VM itself 
+
+# kubectl get pods --all-namespaces -o wide
+NAMESPACE     NAME                          READY   STATUS    RESTARTS   AGE     IP               NODE   NOMINATED NODE
+kube-system   kube-apiserver-ks2            1/1     Running   0          44h     192.168.60.102   ks2    <none>
+kube-system   kube-controller-manager-ks2   1/1     Running   1          6d18h   192.168.60.102   ks2    <none>
+kube-system   kube-scheduler-ks2            1/1     Running   1          6d18h   192.168.60.102   ks2    <none>
+
+
+------------------
 CREATE A POD
 ------------------
 This is giving error now 
@@ -802,6 +893,8 @@ Error from server: Get https://ks2:10250/containerLogs/default/access-56ff88b445
 -----------------------------------
 KUBECONFIG AND SECURITY FOR KUBELET
 -----------------------------------
+
+Script: kubeconfig-kubelet-gen.sh
 
 -  CREATE A kubeconfig FILE FOR KUBELET - 192.168.60.102.kubeconfig
 # Add the cluster information for 192.168.60.102
@@ -832,11 +925,30 @@ kubectl config use-context default --kubeconfig=192.168.60.102.kubeconfig
 -- THEN, COPY THAT FILE TO /etc/kubernetes/kubelet-kubeconfig
 cp 192.168.60.102.kubeconfig /etc/kubernetes/kubelet-kubeconfig
 
-- MODIFY /usr/lib/systemd/system/10-kubeadm.conf
+-- ALSO, COPY THE KUBECONFIG FILE TO ~/.kube/config
+cp /etc/kubernetes/kubelet-kubeconfig ~/.kube/config
+--> This will enable the context (or something) for the linux session
+--> and the following command gives the current context if set in ~/.kube/config
+# kubectl config get-contexts 
+CURRENT   NAME      CLUSTER      AUTHINFO                   NAMESPACE
+*         default   kubernetes   system:node:192.168.60.102
+
+
+- MODIFY kubelet.service file /usr/lib/systemd/system/10-kubeadm.conf
 NOTE: 1. allow-privileged is necessary for creating kube-proxy and such
       2. /var/lab/kubelet/... for key locations are replaced with /etc/kubernetes/pki
 
-File content:
+
+NOTE: IMPORTANT IMPORTANT IMPORTNT
+IF USING FLANNEL:
+1. Add this environment: (NOTE - ADD THIS AFTER YOU INSTALL FLANNEL, AND THEN RESTART KUBELET)
+Environment="KUBELET_NETWORK_ARGS=--network-plugin=cni --cni-conf-dir=/etc/cni/net.d --cni-bin-dir=/opt/cni/bin --node-ip=192.168.60.102"
+
+2. And in kubelet command in that file, reference that environment variable KUBELET_NETWORK_ARGS
+
+
+File: /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
+(without flannel settings mentioned above)
 
 # Note: This dropin only works with kubeadm and kubelet v1.11+
 [Service]
@@ -847,6 +959,11 @@ File content:
 #
 # -- added
 Environment="KUBELET_CONFIG_ARGS=--kubeconfig=/etc/kubernetes/kubelet-config.yaml --pod-manifest-path=/etc/kubernetes/manifests"
+# -- added (NOTE - ADD THIS AFTER YOU INSTALL FLANNEL, AND THEN RESTART KUBELET)
+Environment="KUBELET_NETWORK_ARGS=--network-plugin=cni --cni-conf-dir=/etc/cni/net.d --cni-bin-dir=/opt/cni/bin --node-ip=192.168.8.11"
+#
+# -- added
+Environment="KUBELET_DNS_ARGS=--cluster-dns=10.96.0.10 --cluster-domain=cluster.local"
 
 # This is a file that "kubeadm init" and "kubeadm join" generates at runtime, populating the KUBELET_KUBEADM_ARGS variable dynamically
 EnvironmentFile=-/var/lib/kubelet/kubeadm-flags.env
@@ -854,7 +971,7 @@ EnvironmentFile=-/var/lib/kubelet/kubeadm-flags.env
 # the .NodeRegistration.KubeletExtraArgs object in the configuration files instead. KUBELET_EXTRA_ARGS should be sourced from this file.
 EnvironmentFile=-/etc/sysconfig/kubelet
 ExecStart=
-ExecStart=/usr/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS   --client-ca-file=/etc/kubernetes/pki/ca.pem --tls-cert-file=/etc/kubernetes/pki/192.168.60.102.pem --tls-private-key-file=/etc/kubernetes/pki/192.168.60.102-key.pem --kubeconfig=/etc/kubernetes/kubelet-kubeconfig --allow-privileged
+ExecStart=/usr/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS $KUBELET_NETWORK_ARGS $KUBELET_DNS_ARGS  --client-ca-file=/etc/kubernetes/pki/ca.pem --tls-cert-file=/etc/kubernetes/pki/192.168.60.102.pem --tls-private-key-file=/etc/kubernetes/pki/192.168.60.102-key.pem --kubeconfig=/etc/kubernetes/kubelet-kubeconfig --allow-privileged
 
 - RESTART KUBELET
 systemctl daemon-reload
@@ -863,7 +980,7 @@ journalctl -fu kubelet
 
 --> At this time kubelet did not start properly - see 'ERROR 1' down below
 
-- TO FIX - ADD HOSTNAME ALSO TO CERTIFICATES (EARLIER THOUGHG creating ClusterRole and ClusterRoleBinding will help, but that is not correct fix) 
+- TO FIX - ADD HOSTNAME ALSO TO CERTIFICATES (EARLIER THOUGHT creating ClusterRole and ClusterRoleBinding will help, but that is not correct fix) 
 
 - RESTART KUBELET
 systemctl start kubelet
@@ -872,15 +989,26 @@ kubectl get nodes -o wide
 curl --cacert ./ca.pem https://192.168.60.102:6443/version
 netstat -anp |grep 6443
 
+WORKING ITEMS:
 --> This time it seemed to start properly and nodes were listed (see logs below)
+
+--> Also 'role' for node in kubectl get nodes is 'none' instead of master or worker 
+    - This is ok - it is because it is both master and worker
+ 
+FIXED ITEMS:
+--> And, a busybee pod creation got some errors
+	- these went away after adding ks2 as hostname in kubelet and kubernetes cert generation steps
+	
+TBD ITEMS:
 --> However, curl to API does not work yet (see listings below)
+--> WORKS - curl https://192.168.60.102:6443 --key ./admin-key.pem --cert ./admin.pem --cacert ./ca.pem
+--> DOES NOT WORK - curl --cacert ./ca.pem https://192.168.60.102:6443/version
+
 	TO FIX - need to get a token
 	- see - https://stackoverflow.com/questions/34306082/kubernetes-https-api-return-unauthorized
 	- and also the 'deploy on vmware' document
---> This is ok - Also 'role' for node in kubectl get nodes is 'none' instead of master or worker 
-    - (is it because it is both master and worker?)
---> And, a busybee pod creation got some errors
-	- these went away after adding ks2 as hostname in kubelet and kubernetes cert generation steps
+	
+
 
 [root@ks2 certs]# systemctl start kubelet; journalctl -fu kubelet;
 -- Logs begin at Wed 2019-08-14 13:59:42 IST. --
@@ -992,6 +1120,7 @@ Earlier errors - when ks2 hostname was not applied to kubelet and apiserver cert
 	[root@ks2 .kube]# kubectl exec -ti access-56ff88b445-k4vql /bin/sh
 	Error from server: error dialing backend: x509: certificate is not valid for any names, but wanted to match ks2
 
+TO FIX: CREATE CLUSTERROLE AND CLUSTERROLEBINDING --> SEE BELOW
 ======================================================================
 CREATE ClusterRole and ClusterRoleBinding
 ======================================================================
@@ -1047,7 +1176,22 @@ kubectl create -f kube-apiserver-to-kubelet-bind.yaml
 
 --> clusterrolebinding.rbac.authorization.k8s.io/system:kube-apiserver created
 
+TBD: This curl is not working yet - see in the TBD earlier about the fix for this
+--> one method works, the other does not
+- WORKS
+# curl https://192.168.8.11:6443/version --key ./admin-key.pem --cert ./admin.pem --cacert ./ca.pem
+{
+  "major": "1",
+  "minor": "12",
+  "gitVersion": "v1.12.8",
+  "gitCommit": "a89f8c11a5f4f132503edbc4918c98518fd504e3",
+  "gitTreeState": "clean",
+  "buildDate": "2019-04-23T04:41:47Z",
+  "goVersion": "go1.10.8",
+  "compiler": "gc",
+  "platform": "linux/amd64"
 
+- DOES NOT WORK (TBD)
 [root@ks2 certs]# curl --cacert ./ca.pem https://192.168.60.102:6443/version
 {
   "kind": "Status",
@@ -1076,6 +1220,8 @@ kubectl create -f kube-apiserver-to-kubelet-bind.yaml
 KUBE-PROXY
 =========================
 YML - https://github.com/kubernetes/kubernetes/blob/master/cluster/addons/kube-proxy
+      - These seem to be in helm like format with {{ }} - replace those with appropriate actuals
+      - two files - kube-proxy-rbac.yaml and kube-proxy-ds.yaml
 Options - https://kubernetes.io/docs/reference/command-line-tools-reference/kube-proxy/
 
 some reference - https://github.com/kelseyhightower/intro-to-kubernetes-workshop/blob/master/labs/install-and-configure-kube-proxy.md
@@ -1083,11 +1229,17 @@ some reference - https://github.com/kelseyhightower/intro-to-kubernetes-workshop
 IMAGES - docker pull gcr.io/google-containers/kube-proxy-amd64:v1.12.8 (already done in k8s-base-VM)
 
 Combine two model files into one kube-proxy.yaml
-Copy the file into /etc/kubernetes/manifests - so that kubelet can pick it up and create the pod
+Copy the file into /etc/kubernetes/addons - kubelet will error out if placed in /etc/kubernetes/manifests (see further below)
 
-File kube-proxy.yaml :
+-------------------------
+CREATE kube-proxy.yaml
+-------------------------
 
-# FROM RBAC.YAML
+File kube-proxy.yaml :  (Place this in /etc/kubernetes/addons - not in /etc/kubernetes/manifests)
+Note: Change the kubeconfig file name as per your latest naming convention 
+      (the line - --kubeconfig=/etc/kubernetes/kube-proxy.kubeconfig)
+
+# FROM kube-proxy-rbac.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -1111,7 +1263,7 @@ roleRef:
   name: system:node-proxier
   apiGroup: rbac.authorization.k8s.io
 
-# FROM DS.YAML
+# FROM kube-proxy-ds.yaml
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -1136,8 +1288,8 @@ spec:
     spec:
       priorityClassName: system-node-critical
       hostNetwork: true
-      nodeSelector:
-        node.kubernetes.io/kube-proxy-ds-ready: "true"
+      #nodeSelector:
+        #node.kubernetes.io/kube-proxy-ds-ready: "true"
       tolerations:
       - operator: "Exists"
         effect: "NoExecute"
@@ -1145,13 +1297,14 @@ spec:
         effect: "NoSchedule"
       containers:
       - name: kube-proxy
-        image: docker pull gcr.io/google-containers/kube-proxy-amd64:v1.12.8
+        #image: docker pull gcr.io/google-containers/kube-proxy-amd64:v1.12.8
+        image: gcr.io/google_containers/kube-proxy-amd64:v1.12.8
         resources:
           requests:
             cpu: 100m
         command:
         - /usr/local/bin/kube-proxy
-        - --kubeconfig=/var/lib/kube-proxy/kubeconfig.conf
+        - --kubeconfig=/etc/kubernetes/kube-proxy.kubeconfig
         - --master=https://$(MASTER_IP):6443
         - --cluster-cidr=10.20.0.0/16
         - --masquerade-all
@@ -1172,6 +1325,9 @@ spec:
         - mountPath: /lib/modules
           name: lib-modules
           readOnly: true
+        - mountPath: /etc/kubernetes
+          name: etc-kubernetes
+          readOnly: true
       volumes:
       - name: varlog
         hostPath:
@@ -1183,21 +1339,767 @@ spec:
       - name: lib-modules
         hostPath:
           path: /lib/modules
+      - name: etc-kubernetes
+        hostPath:
+          path: /etc/kubernetes
+          type: Directory
       serviceAccountName: kube-proxy
 
-- CREATE KUBECONFIG FILE
+- CREATE KUBE-PROXY POD
+(see further below)
+
+------------------------------------------
+CREATE KUBECONFIG FILE FOR KUBE-PROXY
+------------------------------------------
+
+Script: kubeconfig-kube-proxy-gen.sh
+
+ kubectl config set-cluster kubernetes \
+--certificate-authority=ca.pem \
+--embed-certs=true \
+--server=https://192.168.60.102:6443 \
+--kubeconfig=kube-proxy.kubeconfig
+
+kubectl config set-credentials kube-proxy \
+--client-certificate=kube-proxy.pem \
+--client-key=kube-proxy-key.pem \
+--embed-certs=true \
+--kubeconfig=kube-proxy.kubeconfig
+
+kubectl config set-context default \
+--cluster=kubernetes \
+--user=kube-proxy \
+--kubeconfig=kube-proxy.kubeconfig
+
+kubectl config use-context default --kubeconfig=kube-proxy.kubeconfig
+
+Get this file:
+kube-proxy.kubeconfig
+
+Copy the file to /etc/kubernetes:
+cp kube-proxy.kubeconfig /etc/kubernetes/kube-proxy.kubeconfig
+
+---------------------
+DEPLOY KUBE-PROXY
+---------------------
+mkdir /etc/kubernetes/addons
+cp kube-proxy.yaml /etc/kubernetes/addons/.
+kubectl create -f /etc/kubernetes/addons/kube-proxy.yaml
+or
+kubectl apply -f /etc/kubernetes/addons/kube-proxy.yml
+
+-------
+VERIFY
+-------
+NOTE: IP addresses for these are all these so far are VM's IP (aka host's IP)
+
+# kubectl get pods --all-namespaces -o wide
+NAMESPACE     NAME                          READY   STATUS    RESTARTS   AGE     IP               NODE   NOMINATED NODE
+kube-system   kube-apiserver-ks2            1/1     Running   0          44h     192.168.60.102   ks2    <none>
+kube-system   kube-controller-manager-ks2   1/1     Running   1          6d18h   192.168.60.102   ks2    <none>
+kube-system   kube-proxy-txnx8              1/1     Running   0          8m40s   192.168.60.102   ks2    <none>
+kube-system   kube-scheduler-ks2            1/1     Running   1          6d18h   192.168.60.102   ks2    <none>
+
+=========================
+COREDNS
+=========================
+https://kubernetes.io/docs/tasks/administer-cluster/coredns/
+--> https://kubernetes.io/docs/tasks/administer-cluster/coredns/#installing-coredns
+	--> https://github.com/coredns/deployment/tree/master/kubernetes
+
+These docs above seem to imply that in 1.12 and below versions, install kube-dns first and then change to coredns.
+
+So, install kube-dns first
+
+----------------------
+KUBE-DNS
+----------------------
+- GET THE YAML 
+https://github.com/kubernetes/kubernetes/blob/master/cluster/addons/dns/kube-dns/kube-dns.yaml.base
+--> get this and rename as kube-dns.yaml
+
+- MODIFY THE YAML
+In the downloaded file, change the following settings:
+
+__PILLAR__DNS__SERVER__ = 10.96.0.10 (derive this from the service ip range in kube-apiserver.yaml)
+__PILLAR__DNS__MEMORY__LIMIT__ = 150Mi (this is case-sensitive - write it as Mi)
+__PILLAR__DNS__DOMAIN__ = cluster.local. (which is usual standard)
+--> NOTE - cluster.local. (with a dot at the end) in "domain=" section
+-->.       without dot in the other sections
+
+Here is the difference between the base (downloaded) and the modified one:
+[root@ksn1 addons]# diff *base *dns*l
+33c33
+<   clusterIP: __PILLAR__DNS__SERVER__
+---
+>   clusterIP: 10.96.0.10
+110c110
+<             memory: __PILLAR__DNS__MEMORY__LIMIT__
+---
+>             memory: 150mi
+133c133
+<         - --domain=__PILLAR__DNS__DOMAIN__.
+---
+>         - --domain=cluster.local.
+175c175
+<         - --server=/__PILLAR__DNS__DOMAIN__/127.0.0.1#10053
+---
+>         - --server=/cluster.local/127.0.0.1#10053
+207,208c207,208
+<         - --probe=kubedns,127.0.0.1:10053,kubernetes.default.svc.__PILLAR__DNS__DOMAIN__,5,SRV
+<         - --probe=dnsmasq,127.0.0.1:53,kubernetes.default.svc.__PILLAR__DNS__DOMAIN__,5,SRV
+---
+>         - --probe=kubedns,127.0.0.1:10053,kubernetes.default.svc.cluster.local,5,SRV
+>         - --probe=dnsmasq,127.0.0.1:53,kubernetes.default.svc.cluster.local,5,SRV
 
 
-- ERROR
+File:  /etc/kubernetes/addons/kube-dns.yaml.base (downloaded) (see the modified one down below)
+(NOTE - modify settings as specified above)
+
+# Copyright 2016 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Should keep target in cluster/addons/dns-horizontal-autoscaler/dns-horizontal-autoscaler.yaml
+# in sync with this file.
+
+# __MACHINE_GENERATED_WARNING__
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-dns
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+    kubernetes.io/name: "KubeDNS"
+spec:
+  selector:
+    k8s-app: kube-dns
+  clusterIP: __PILLAR__DNS__SERVER__
+  ports:
+  - name: dns
+    port: 53
+    protocol: UDP
+  - name: dns-tcp
+    port: 53
+    protocol: TCP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kube-dns
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kube-dns
+  namespace: kube-system
+  labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kube-dns
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  # replicas: not specified here:
+  # 1. In order to make Addon Manager do not reconcile this replicas parameter.
+  # 2. Default is 1.
+  # 3. Will be tuned in real time if DNS horizontal auto-scaling is turned on.
+  strategy:
+    rollingUpdate:
+      maxSurge: 10%
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      k8s-app: kube-dns
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-dns
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+        prometheus.io/port: "10054"
+        prometheus.io/scrape: "true"
+    spec:
+      priorityClassName: system-cluster-critical
+      securityContext:
+        supplementalGroups: [ 65534 ]
+        fsGroup: 65534
+      tolerations:
+      - key: "CriticalAddonsOnly"
+        operator: "Exists"
+      volumes:
+      - name: kube-dns-config
+        configMap:
+          name: kube-dns
+          optional: true
+      containers:
+      - name: kubedns
+        image: k8s.gcr.io/k8s-dns-kube-dns:1.14.13
+        resources:
+          # TODO: Set memory limits when we've profiled the container for large
+          # clusters, then set request = limit to keep this container in
+          # guaranteed class. Currently, this container falls into the
+          # "burstable" category so the kubelet doesn't backoff from restarting it.
+          limits:
+            memory: __PILLAR__DNS__MEMORY__LIMIT__
+          requests:
+            cpu: 100m
+            memory: 70Mi
+        livenessProbe:
+          httpGet:
+            path: /healthcheck/kubedns
+            port: 10054
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /readiness
+            port: 8081
+            scheme: HTTP
+          # we poll on pod startup for the Kubernetes master service and
+          # only setup the /readiness HTTP server once that's available.
+          initialDelaySeconds: 3
+          timeoutSeconds: 5
+        args:
+        - --domain=__PILLAR__DNS__DOMAIN__.
+        - --dns-port=10053
+        - --config-dir=/kube-dns-config
+        - --v=2
+        env:
+        - name: PROMETHEUS_PORT
+          value: "10055"
+        ports:
+        - containerPort: 10053
+          name: dns-local
+          protocol: UDP
+        - containerPort: 10053
+          name: dns-tcp-local
+          protocol: TCP
+        - containerPort: 10055
+          name: metrics
+          protocol: TCP
+        volumeMounts:
+        - name: kube-dns-config
+          mountPath: /kube-dns-config
+      - name: dnsmasq
+        image: k8s.gcr.io/k8s-dns-dnsmasq-nanny:1.14.13
+        livenessProbe:
+          httpGet:
+            path: /healthcheck/dnsmasq
+            port: 10054
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        args:
+        - -v=2
+        - -logtostderr
+        - -configDir=/etc/k8s/dns/dnsmasq-nanny
+        - -restartDnsmasq=true
+        - --
+        - -k
+        - --cache-size=1000
+        - --no-negcache
+        - --dns-loop-detect
+        - --log-facility=-
+        - --server=/__PILLAR__DNS__DOMAIN__/127.0.0.1#10053
+        - --server=/in-addr.arpa/127.0.0.1#10053
+        - --server=/ip6.arpa/127.0.0.1#10053
+        ports:
+        - containerPort: 53
+          name: dns
+          protocol: UDP
+        - containerPort: 53
+          name: dns-tcp
+          protocol: TCP
+        # see: https://github.com/kubernetes/kubernetes/issues/29055 for details
+        resources:
+          requests:
+            cpu: 150m
+            memory: 20Mi
+        volumeMounts:
+        - name: kube-dns-config
+          mountPath: /etc/k8s/dns/dnsmasq-nanny
+      - name: sidecar
+        image: k8s.gcr.io/k8s-dns-sidecar:1.14.13
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: 10054
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        args:
+        - --v=2
+        - --logtostderr
+        - --probe=kubedns,127.0.0.1:10053,kubernetes.default.svc.__PILLAR__DNS__DOMAIN__,5,SRV
+        - --probe=dnsmasq,127.0.0.1:53,kubernetes.default.svc.__PILLAR__DNS__DOMAIN__,5,SRV
+        ports:
+        - containerPort: 10054
+          name: metrics
+          protocol: TCP
+        resources:
+          requests:
+            memory: 20Mi
+            cpu: 10m
+      dnsPolicy: Default  # Don't use cluster DNS.
+      serviceAccountName: kube-dns
+ 
+- - - - - - - - - - - - - - - - 
+ File kube-dns.yaml (modified):
+- - - - - - - - - - - - - - - - 
+# Copyright 2016 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Should keep target in cluster/addons/dns-horizontal-autoscaler/dns-horizontal-autoscaler.yaml
+# in sync with this file.
+
+# __MACHINE_GENERATED_WARNING__
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-dns
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+    kubernetes.io/name: "KubeDNS"
+spec:
+  selector:
+    k8s-app: kube-dns
+  clusterIP: 10.96.0.10
+  ports:
+  - name: dns
+    port: 53
+    protocol: UDP
+  - name: dns-tcp
+    port: 53
+    protocol: TCP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kube-dns
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kube-dns
+  namespace: kube-system
+  labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kube-dns
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  # replicas: not specified here:
+  # 1. In order to make Addon Manager do not reconcile this replicas parameter.
+  # 2. Default is 1.
+  # 3. Will be tuned in real time if DNS horizontal auto-scaling is turned on.
+  strategy:
+    rollingUpdate:
+      maxSurge: 10%
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      k8s-app: kube-dns
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-dns
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+        prometheus.io/port: "10054"
+        prometheus.io/scrape: "true"
+    spec:
+      priorityClassName: system-cluster-critical
+      securityContext:
+        supplementalGroups: [ 65534 ]
+        fsGroup: 65534
+      tolerations:
+      - key: "CriticalAddonsOnly"
+        operator: "Exists"
+      volumes:
+      - name: kube-dns-config
+        configMap:
+          name: kube-dns
+          optional: true
+      containers:
+      - name: kubedns
+        image: k8s.gcr.io/k8s-dns-kube-dns:1.14.13
+        resources:
+          # TODO: Set memory limits when we've profiled the container for large
+          # clusters, then set request = limit to keep this container in
+          # guaranteed class. Currently, this container falls into the
+          # "burstable" category so the kubelet doesn't backoff from restarting it.
+          limits:
+            memory: 150Mi
+          requests:
+            cpu: 100m
+            memory: 70Mi
+        livenessProbe:
+          httpGet:
+            path: /healthcheck/kubedns
+            port: 10054
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /readiness
+            port: 8081
+            scheme: HTTP
+          # we poll on pod startup for the Kubernetes master service and
+          # only setup the /readiness HTTP server once that's available.
+          initialDelaySeconds: 3
+          timeoutSeconds: 5
+        args:
+        - --domain=cluster.local.
+        - --dns-port=10053
+        - --config-dir=/kube-dns-config
+        - --v=2
+        env:
+        - name: PROMETHEUS_PORT
+          value: "10055"
+        ports:
+        - containerPort: 10053
+          name: dns-local
+          protocol: UDP
+        - containerPort: 10053
+          name: dns-tcp-local
+          protocol: TCP
+        - containerPort: 10055
+          name: metrics
+          protocol: TCP
+        volumeMounts:
+        - name: kube-dns-config
+          mountPath: /kube-dns-config
+      - name: dnsmasq
+        image: k8s.gcr.io/k8s-dns-dnsmasq-nanny:1.14.13
+        livenessProbe:
+          httpGet:
+            path: /healthcheck/dnsmasq
+            port: 10054
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        args:
+        - -v=2
+        - -logtostderr
+        - -configDir=/etc/k8s/dns/dnsmasq-nanny
+        - -restartDnsmasq=true
+        - --
+        - -k
+        - --cache-size=1000
+        - --no-negcache
+        - --dns-loop-detect
+        - --log-facility=-
+        - --server=/cluster.local/127.0.0.1#10053
+        - --server=/in-addr.arpa/127.0.0.1#10053
+        - --server=/ip6.arpa/127.0.0.1#10053
+        ports:
+        - containerPort: 53
+          name: dns
+          protocol: UDP
+        - containerPort: 53
+          name: dns-tcp
+          protocol: TCP
+        # see: https://github.com/kubernetes/kubernetes/issues/29055 for details
+        resources:
+          requests:
+            cpu: 150m
+            memory: 20Mi
+        volumeMounts:
+        - name: kube-dns-config
+          mountPath: /etc/k8s/dns/dnsmasq-nanny
+      - name: sidecar
+        image: k8s.gcr.io/k8s-dns-sidecar:1.14.13
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: 10054
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        args:
+        - --v=2
+        - --logtostderr
+        - --probe=kubedns,127.0.0.1:10053,kubernetes.default.svc.cluster.local,5,SRV
+        - --probe=dnsmasq,127.0.0.1:53,kubernetes.default.svc.cluster.local,5,SRV
+        ports:
+        - containerPort: 10054
+          name: metrics
+          protocol: TCP
+        resources:
+          requests:
+            memory: 20Mi
+            cpu: 10m
+      dnsPolicy: Default  # Don't use cluster DNS.
+      serviceAccountName: kube-dns
+ 
+ - DEPLOY KUBE-DNS
+kubectl apply -f /etc/kubernetes/addons/kube-dns.yaml
+service/kube-dns created
+serviceaccount/kube-dns created
+configmap/kube-dns created
+deployment.apps/kube-dns created
+
+- VERIFY STUFF AS OF NOW 
+# kubectl get pods --all-namespaces -o wide
+NAMESPACE     NAME                           READY   STATUS    RESTARTS   AGE     IP             NODE   NOMINATED NODE
+kube-system   kube-apiserver-ksn1            1/1     Running   0          2m26s   192.168.8.11   ksn1   <none>
+kube-system   kube-controller-manager-ksn1   1/1     Running   3          10d     192.168.8.11   ksn1   <none>
+kube-system   kube-dns-cbc549dbd-29m87       2/3     Running   1          105s    172.17.0.2     ksn1   <none>
+kube-system   kube-proxy-c58ll               1/1     Running   2          8d      192.168.8.11   ksn1   <none>
+kube-system   kube-scheduler-ksn1            1/1     Running   3          10d     192.168.8.11   ksn1   <none>
+
+- ERROR DIAGNOSIS (before successful creation)
+NOTE: There SHOULD be a kube-dns pod - only a deployment and a service is being seen now
+
+# kubectl get deployment --all-namespaces
+NAMESPACE     NAME       DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+kube-system   kube-dns   1         0         0            0           23h
+
+# kubectl get pods --all-namespaces -o wide
+NAMESPACE     NAME                           READY   STATUS    RESTARTS   AGE    IP             NODE   NOMINATED NODE
+kube-system   kube-apiserver-ksn1            1/1     Running   0          4d1h   192.168.8.11   ksn1   <none>
+kube-system   kube-controller-manager-ksn1   1/1     Running   0          4d1h   192.168.8.11   ksn1   <none>
+kube-system   kube-proxy-c58ll               1/1     Running   0          26h    192.168.8.11   ksn1   <none>
+kube-system   kube-scheduler-ksn1            1/1     Running   0          4d1h   192.168.8.11   ksn1   <none>
+
+# kubectl get svc --all-namespaces
+NAMESPACE     NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)         AGE
+default       kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP         5d
+kube-system   kube-dns     ClusterIP   10.96.0.10   <none>        53/UDP,53/TCP   23h
+
+You may have to scale up the number pods: (at least it should have created one pod - but it did not)
+# kubectl --namespace=kube-system scale deployment kube-dns --replicas=1
+
+It has created also a replicaset
+
+# kubectl get rs --all-namespaces
+NAMESPACE     NAME                 DESIRED   CURRENT   READY   AGE
+kube-system   kube-dns-cbc549dbd   1         0         0       6d21h
+
+# kubectl scale rs kube-dns-cbc549dbd  -n kube-system --replicas=0
+# kubectl scale rs kube-dns-cbc549dbd  -n kube-system --replicas=1
+
+# kubectl describe rs kube-dns-cbc549dbd  -n kube-system
+Conditions:
+  Type             Status  Reason
+  ----             ------  ------
+  ReplicaFailure   True    FailedCreate
+Events:
+  Type     Reason        Age                     From                   Message
+  ----     ------        ----                    ----                   -------
+  Warning  FailedCreate  6d2h                    replicaset-controller  Error creating: pods "kube-dns-cbc549dbd-rvqcc" is forbidden: pod.Spec.SecurityContext.SupplementalGroups is forbidden
+...
+...
+  Warning  FailedCreate  4m6s (x25 over 20m)     replicaset-controller  (combined from similar events): Error creating: pods "kube-dns-cbc549dbd-mlkvd" is forbidden: pod.Spec.SecurityContext.SupplementalGroups is forbidden
+
+-- CAUSE
+https://github.com/kubernetes/kubernetes/issues/45324
+- Did your apiserver switch on SecurityContextDeny admission controller ?
+- https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#securitycontextdeny
+- https://kubernetes.io/docs/concepts/policy/pod-security-policy/ (READ THIS - ALSO FOR GENERAL INFO)
+
+-- FIX
+Removed the directive securitycontextdeny from kube-apiserver.yml and restarted kubelet
+
+======================
+FLANNEL
+======================
+- MANIFEST
+Apply directly from here: https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+(like kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml)
+Actual git repo file: https://github.com/coreos/flannel/blob/master/Documentation/kube-flannel.yml
+
+- BRIEF
+https://github.com/coreos/flannel/blob/master/Documentation/kubernetes.md
+	kube-flannel.yaml
+	The flannel manifest defines four things:
+
+	A ClusterRole and ClusterRoleBinding for role based acccess control (RBAC).
+	A service account for flannel to use.
+	A ConfigMap containing both a CNI configuration and a flannel configuration. The network in the flannel 
+	configuration should match the pod network CIDR. The choice of backend is also made here and defaults to VXLAN.
+	A DaemonSet for every architecture to deploy the flannel pod on each Node. The pod has two containers 
+	1) the flannel daemon itself, and 
+	2) an initContainer for deploying the CNI configuration to a location that the kubelet can read.
+	When you run pods, they will be allocated IP addresses from the pod network CIDR. 
+	No matter which node those pods end up on, they will be able to communicate with each other.
+
+- CREATE FLANNEL POD
+This, in a virtualbox vm with NAT enabled can give an error on certificates (see troubleshooting below)
+cd /etc/kubernetes/addons
+wget https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+kubectl apply -f kube-flannel.yml
+
+- ERROR AND TROUBLESHOOTING
+There are two errors below:
+1. It is using the nat interface which is the first interface in the list of interfaces in the VM
+2. It is not liking the certificate of mostly kube-apiserver
+3. Different error after fixing 2
+
+[root@ksn1 addons]# kubectl logs kube-flannel-ds-amd64-2hbhp -n kube-system
+I0924 11:11:47.616440       1 main.go:514] Determining IP address of default interface
+I0924 11:11:47.619268       1 main.go:527] Using interface with name enp0s3 and address 10.0.2.15
+I0924 11:11:47.619331       1 main.go:544] Defaulting external address to interface address (10.0.2.15)
+E0924 11:11:47.745209       1 main.go:241] Failed to create SubnetManager: error retrieving pod spec for 'kube-system/kube-flannel-ds-amd64-2hbhp': Get https://10.96.0.1:443/api/v1/namespaces/kube-system/pods/kube-flannel-ds-amd64-2hbhp: x509: certificate is valid for 192.168.8.11, 127.0.0.1, not 10.96.0.1
+
+Fixes:
+1. For NAT interface thing
+https://stackoverflow.com/questions/47845739/configuring-flannel-to-use-a-non-default-interface-in-kubernetes
+In kube-flannel.yml add the following line mentioning the interface to use (the one of the vm IP used in certs)
+      containers:
+      - name: kube-flannel
+        image: quay.io/coreos/flannel:v0.11.0-amd64
+        command:
+        - /opt/bin/flanneld
+        args:
+        - --ip-masq
+        - --kube-subnet-mgr
+        - --iface=enp0s8
+
+2. For the certificates 
+https://github.com/kelseyhightower/kubernetes-the-hard-way/issues/420
+
+- add 10.96.0.1 to kube-apiserver certificate (regenerate the certificate and copy to /etc/kubernetes/pki)
+--> then, stop kubelet, docker
+--> then, start docker, etcd, kubelet
+--> this restart is needed 
+
+3. After that, getting this:
+[root@ksn1 certs-ip-and-host-based]# kubectl logs kube-flannel-ds-amd64-pjk5v  -n kube-system
+I0924 13:23:32.523291       1 main.go:527] Using interface with name enp0s8 and address 192.168.8.11
+I0924 13:23:32.523633       1 main.go:540] Using 192.168.8.11 as external address
+I0924 13:23:32.731403       1 kube.go:126] Waiting 10m0s for node controller to sync
+I0924 13:23:32.731511       1 kube.go:309] Starting kube subnet manager
+I0924 13:23:33.732138       1 kube.go:133] Node controller sync successful
+I0924 13:23:33.732284       1 main.go:244] Created subnet manager: Kubernetes Subnet Manager - ksn1
+I0924 13:23:33.732299       1 main.go:247] Installing signal handlers
+I0924 13:23:33.733932       1 main.go:386] Found network config - Backend type: vxlan
+I0924 13:23:33.734464       1 vxlan.go:120] VXLAN config: VNI=1 Port=0 GBP=false DirectRouting=false
+E0924 13:23:33.735789       1 main.go:289] Error registering network: failed to acquire lease: node "ksn1" pod cidr not assigned
+I0924 13:23:33.735922       1 main.go:366] Stopping shutdownHandler...
+
+
+FIXES:
+- https://github.com/coreos/flannel/issues/728
+- https://coreos.com/flannel/docs/latest/kubernetes.html
+
+From: https://github.com/coreos/flannel/issues/728
+[root@ksn1 certs-ip-and-host-based]# kubectl get nodes -o jsonpath='{.items[*].spec.podCIDR}'
+[root@ksn1 certs-ip-and-host-based]# 
+
+To fix it:
+a. Add this to kube-controller-manager.yaml:
+- "- --allocate-node-cidrs"
+Then, restart kubelet
+
+b. Add this to /usr/lib/systemd/system/kubelet.d/10-kubeadm.conf
+# -- added (NOTE - ADD THIS AFTER YOU INSTALL FLANNEL, AND THEN RESTART KUBELET)
+Environment="KUBELET_NETWORK_ARGS=--network-plugin=cni --cni-conf-dir=/etc/cni/net.d --cni-bin-dir=/opt/cni/bin --node-ip=192.168.8.11"
+
+And in kubelet command in that file, reference that environment variable KUBELET_NETWORK_ARGS:
+ExecStart=/usr/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS $KUBELET_NETWORK_ARGS  --client-ca-file=/etc/kubernetes/pki/ca.pem --tls-cert-file=/etc/kubernetes/pki/kubelet-192.168.8.11.pem --tls-private-key-file=/etc/kubernetes/pki/kubelet-192.168.8.11-key.pem --kubeconfig=/etc/kubernetes/kubeconfig.kubelet-192.168.8.11 --allow-privileged
+
+Then restart kubelet
+
+From: https://coreos.com/flannel/docs/latest/kubernetes.html
+Add the kubeadm based --pod-network-cidr=10.20.0.0/24 to flannel network config file
+--> otherwise, even with the other fix above, pods get docker IPs
+
+Verify:
+# kubectl get nodes -o jsonpath='{.items[*].spec.podCIDR}'
+10.20.0.0/24 --> THIS THE POD-CIDR RANGE IN CONTROLLER MANAGER (but, with 24 instead of 16 of the pod-cidr range) 
+
+Then, let us assume we created kube-dns - and get pods now:
+NOTE: Now you can see the kube-dns pod has CIDR IP
+# kubectl get pods --all-namespaces -o wide
+NAMESPACE     NAME                           READY   STATUS    RESTARTS   AGE     IP             NODE   NOMINATED NODE
+kube-system   kube-apiserver-ksn1            1/1     Running   2          104m    192.168.8.11   ksn1   <none>
+kube-system   kube-controller-manager-ksn1   1/1     Running   1          73m     192.168.8.11   ksn1   <none>
+kube-system   kube-dns-cbc549dbd-7n658       3/3     Running   0          4m50s   10.20.0.2      ksn1   <none>
+kube-system   kube-flannel-ds-amd64-pjk5v    1/1     Running   16         100m    192.168.8.11   ksn1   <none>
+kube-system   kube-proxy-c58ll               1/1     Running   4          8d      192.168.8.11   ksn1   <none>
+kube-system   kube-scheduler-ksn1            1/1     Running   5          11d     192.168.8.11   ksn1   <none>
+
+- FYI
+Check contents of the following folders
+    - pathPrefix: "/etc/cni/net.d"
+    - pathPrefix: "/run/flannel"
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+===========================
+APPENDIX
+===========================
+------------------------------------------------------------------------------------
+- ERROR - IF YOU PLACE kube-proxy.yaml in /etc/kubernetes/manifests
+	- because kube-proxy is a daemonset and not pod - manifests take only pods
+------------------------------------------------------------------------------------
 
 Aug 19 16:30:47 ks2 kubelet[18240]: E0819 16:30:47.254493   18240 file.go:108] Unable to process watch event: can't process config file "/etc/kubernetes/manifests/kube-proxy.yaml": /etc/kubernetes/manifests/kube-proxy.yaml: couldn't parse as pod(invalid pod: &core.ServiceAccount{TypeMeta:v1.TypeMeta{Kind:"", APIVersion:""}, ObjectMeta:v1.ObjectMeta{Name:"kube-proxy", GenerateName:"", Namespace:"kube-system", SelfLink:"", UID:"", ResourceVersion:"", Generation:0, CreationTimestamp:v1.Time{Time:time.Time{wall:0x0, ext:0, loc:(*time.Location)(nil)}}, DeletionTimestamp:(*v1.Time)(nil), DeletionGracePeriodSeconds:(*int64)(nil), Labels:map[string]string{"addonmanager.kubernetes.io/mode":"Reconcile"}, Annotations:map[string]string(nil), OwnerReferences:[]v1.OwnerReference(nil), Initializers:(*v1.Initializers)(nil), Finalizers:[]string(nil), ClusterName:""}, Secrets:[]core.ObjectReference(nil), ImagePullSecrets:[]core.LocalObjectReference(nil), AutomountServiceAccountToken:(*bool)(nil)}), please check config file.
-
-Aug 19 16:30:47 ks2 kubelet[18240]: E0819 16:30:47.254682   18240 file.go:108] Unable to process watch event: can't process config file "/etc/kubernetes/manifests/kube-proxy.yaml": /etc/kubernetes/manifests/kube-proxy.yaml: couldn't parse as pod(invalid pod: &core.ServiceAccount{TypeMeta:v1.TypeMeta{Kind:"", APIVersion:""}, ObjectMeta:v1.ObjectMeta{Name:"kube-proxy", GenerateName:"", Namespace:"kube-system", SelfLink:"", UID:"", ResourceVersion:"", Generation:0, CreationTimestamp:v1.Time{Time:time.Time{wall:0x0, ext:0, loc:(*time.Location)(nil)}}, DeletionTimestamp:(*v1.Time)(nil), DeletionGracePeriodSeconds:(*int64)(nil), Labels:map[string]string{"addonmanager.kubernetes.io/mode":"Reconcile"}, Annotations:map[string]string(nil), OwnerReferences:[]v1.OwnerReference(nil), Initializers:(*v1.Initializers)(nil), Finalizers:[]string(nil), ClusterName:""}, Secrets:[]core.ObjectReference(nil), ImagePullSecrets:[]core.LocalObjectReference(nil), AutomountServiceAccountToken:(*bool)(nil)}), please check config file.
-
-Aug 19 16:30:51 ks2 kubelet[18240]: E0819 16:30:51.203871   18240 file.go:187] Can't process manifest file "/etc/kubernetes/manifests/kube-proxy.yaml": /etc/kubernetes/manifests/kube-proxy.yaml: couldn't parse as pod(invalid pod: &core.ServiceAccount{TypeMeta:v1.TypeMeta{Kind:"", APIVersion:""}, ObjectMeta:v1.ObjectMeta{Name:"kube-proxy", GenerateName:"", Namespace:"kube-system", SelfLink:"", UID:"", ResourceVersion:"", Generation:0, CreationTimestamp:v1.Time{Time:time.Time{wall:0x0, ext:0, loc:(*time.Location)(nil)}}, DeletionTimestamp:(*v1.Time)(nil), DeletionGracePeriodSeconds:(*int64)(nil), Labels:map[string]string{"addonmanager.kubernetes.io/mode":"Reconcile"}, Annotations:map[string]string(nil), OwnerReferences:[]v1.OwnerReference(nil), Initializers:(*v1.Initializers)(nil), Finalizers:[]string(nil), ClusterName:""}, Secrets:[]core.ObjectReference(nil), ImagePullSecrets:[]core.LocalObjectReference(nil), AutomountServiceAccountToken:(*bool)(nil)}), please check config file.
-
-Aug 19 16:31:11 ks2 kubelet[18240]: E0819 16:31:11.203647   18240 file.go:187] Can't process manifest file "/etc/kubernetes/manifests/kube-proxy.yaml": /etc/kubernetes/manifests/kube-proxy.yaml: couldn't parse as pod(invalid pod: &core.ServiceAccount{TypeMeta:v1.TypeMeta{Kind:"", APIVersion:""}, ObjectMeta:v1.ObjectMeta{Name:"kube-proxy", GenerateName:"", Namespace:"kube-system", SelfLink:"", UID:"", ResourceVersion:"", Generation:0, CreationTimestamp:v1.Time{Time:time.Time{wall:0x0, ext:0, loc:(*time.Location)(nil)}}, DeletionTimestamp:(*v1.Time)(nil), DeletionGracePeriodSeconds:(*int64)(nil), Labels:map[string]string{"addonmanager.kubernetes.io/mode":"Reconcile"}, Annotations:map[string]string(nil), OwnerReferences:[]v1.OwnerReference(nil), Initializers:(*v1.Initializers)(nil), Finalizers:[]string(nil), ClusterName:""}, Secrets:[]core.ObjectReference(nil), ImagePullSecrets:[]core.LocalObjectReference(nil), AutomountServiceAccountToken:(*bool)(nil)}), please check config file.
-^C
 
 
 ~~~~~~~~~~~~~~~~~~~~
@@ -1305,16 +2207,83 @@ spec:
           path: /lib/modules
       serviceAccountName: kube-proxy
 
-=========================
+~~~~~~~~~~~~~~~~~~~~~~~
+FLANNEL 
+~~~~~~~~~~~~~~~~~~~~~~~
+
+NOTE:  All stuff below as of now is just general notes - not yet tried out actual steps
+
+https://github.com/coreos/flannel
+--> https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+
+Without an overlay network, pods get only docker IPs
+To give them cluster-CIDR IPs, overlay network like Flannel, Calico should be installed
+
+--------------------------------------------
+NGINX POD WITHOUT FLANNEL
+--------------------------------------------
+
+File: nginx-dep.yaml
+
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  replicas: 2 # tells deployment to run 2 pods matching the template
+  #replicas: 1 # tells deployment to run 2 pods matching the template
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+
+
+File: nginx-dep.sh
+
+kubectl apply -f nginx-dep.yaml
+
+- Verify
+
+[root@ks2 ~]# kubectl get pods 
+NAME                                READY   STATUS    RESTARTS   AGE
+nginx-deployment-57db5dc57d-2497h   1/1     Running   0          17m
+nginx-deployment-57db5dc57d-zvl57   1/1     Running   0          17m
+
+[root@ks2 ~]# kubectl get pods -o wide
+NAME                                READY   STATUS    RESTARTS   AGE   IP           NODE   NOMINATED NODE
+nginx-deployment-57db5dc57d-2497h   1/1     Running   0          17m   172.17.0.2   ks2    <none>
+nginx-deployment-57db5dc57d-zvl57   1/1     Running   0          17m   172.17.0.3   ks2    <none>
+
+
+------------------------------------------
+THESE FOLDERS WILL BE CREATED IN THE HOST
+------------------------------------------
+
+    - pathPrefix: "/etc/cni/net.d"
+    - pathPrefix: "/run/flannel"
+    - pathPrefix: "/etc/kube-flannel"  (MAYBE NOT)
+
+----------------------
+DOWNLOAD AND EDIT YAML
+----------------------
+https://github.com/coreos/flannel
+--> https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+
+
+~~~~~~~~~~~~~~~~~~~~~~~
 KUBE-DNS (or COREDNS)
-=========================
+~~~~~~~~~~~~~~~~~~~~~~~
 https://github.com/kubernetes/kubernetes/blob/master/cluster/addons/dns/kube-dns/kube-dns.yaml.in
-
-
-
-
-
-
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ERROR LISTINGS

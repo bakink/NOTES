@@ -2,6 +2,9 @@ DISCOURSE
 https://blog.openshift.com/kubernetes-deep-dive-api-server-part-2/ - many things
 https://dev.to/chuck_ha/reading-kubernetes-logs-315k - Reading logs 
 
+PLAYGROUNDS:
+https://www.katacoda.com/courses/kubernetes/playground
+http://labs.play-with-k8s.com/
 
 - - - - - - - - - - - - - - - - - 
 NOW USING:
@@ -10,8 +13,44 @@ https://blog.inkubate.io/deploy-kubernetes-1-9-from-scratch-on-vmware-vsphere/
 https://www.ibm.com/support/knowledgecenter/en/SSMNED_5.0.0/com.ibm.apic.install.doc/tapic_install_Kubernetes.html
 (similar to https://blog.inkubate.io/deploy-kubernetes-1-9-from-scratch-on-vmware-vsphere/)
 
-Another one - multimaster with kubeadm: 
+https://github.com/kubernetes/kubernetes/issues/51881 (has some simple steps to start each component individually)
+
+Try read this official doc for TLS, certs etc
+- https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet-tls-bootstrapping/
+- https://kubernetes.io/docs/concepts/cluster-administration/certificates/ - how to generate certificates
+- https://kubernetes.io/docs/setup/best-practices/certificates/ - certificates - where all to use
+https://jvns.ca/blog/2017/08/05/how-kubernetes-certificates-work/ - certificates - where all to use
+- - - - - - - - - - - - - - - - - 
+
+COREDNS/KUBE-DNS:
+
+Maybe try this:
+https://github.com/kelseyhightower/kubernetes-the-hard-way/blob/master/docs/12-dns-addon.md (this has for 1.15 coredns itself)
+- OR - 
+https://icicimov.github.io/blog/kubernetes/Kubernetes-cluster-step-by-step-Part7/
+(kubedns derived probably from https://github.com/kubernetes/kubernetes/blob/master/cluster/addons/dns/kube-dns/kube-dns.yaml.base)
+
+Other confusing stuff:
+https://kubernetes.io/docs/tasks/administer-cluster/coredns/ - install addon coredns 
+--> This one is not clear - https://github.com/coredns/deployment/tree/master/kubernetes
+    This is also not clear - https://kubernetes.io/docs/tasks/administer-cluster/dns-custom-nameservers/#coredns
+    Try this one - https://kubernetes.io/docs/concepts/cluster-administration/addons/
+    --> https://coredns.io/
+    These docs above seem to imply that in 1.12 and below versions, install kube-dns first and then change to coredns.
+    --> Installing kube-dns:  ???
+    ALSO SEE various ADDONS and in that dns addons - https://github.com/kubernetes/kubernetes/tree/master/cluster/addons/dns
+
+MULTIMASTTER with KUBEADM: 
 - https://blog.inkubate.io/install-and-configure-a-multi-master-kubernetes-cluster-with-kubeadm/
+(also see https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/)
+
+WITH ANSIBLE
+https://www.tauceti.blog/post/kubernetes-the-not-so-hard-way-with-ansible-certificate-authority/
+- https://github.com/kelseyhightower/kubernetes-the-hard-way/blob/1.12.0/docs/02-client-tools.md
+- https://github.com/kelseyhightower/kubernetes-the-hard-way/blob/1.12.0/docs/04-certificate-authority.md
+
+FLANNEL:
+https://blog.laputa.io/kubernetes-flannel-networking-6a1cb1f8ec7c  --> architecture - READ THIS
 
 - - - - - - - - - - - - - - - - - 
 
@@ -40,6 +79,9 @@ https://kubernetes.io/docs/reference/
 https://kubernetes.io/docs/reference/command-line-tools-reference/
 https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/
 
+KUBEADM OPTIONS
+https://godoc.org/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1
+https://godoc.org/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2
 
 - - - - - - -  --  - --  - -
 MUST TRY:
@@ -80,9 +122,30 @@ https://blog.giantswarm.io/what-you-yaml-is-what-you-get/
 Helm secuirty -
 https://engineering.bitnami.com/articles/helm-security.html
 
-KUBERNETES INSTALL/CONFIG - HA
 
 CONFIGMAP
+NOTE: official docs are crazy - use other tutorials
+- Tutorials
+https://medium.com/@Alibaba_Cloud/how-to-create-and-use-configmaps-in-kubernetes-e6d1e0b150b4
+    - very good- but does not talk about mounting volumes
+    - "from-env-file" method which converts file contents to literals
+https://docs.openshift.com/container-platform/3.11/dev_guide/configmaps.html
+    - very good, derived from the crazy official docs
+https://unofficial-kubernetes.readthedocs.io/en/latest/tasks/configure-pod-container/configmap/  
+    - very good, derived from the crazy official docs
+https://dzone.com/articles/k8s-knowhow-using-a-configmap
+    - using in java, spring-boot
+https://matthewpalmer.net/kubernetes-app-developer/articles/configmap-example-yaml.html
+    - in this, env var listing for the 'file' key-values did not list as in the example
+
+- For from-env-file
+https://medium.com/@Alibaba_Cloud/how-to-create-and-use-configmaps-in-kubernetes-e6d1e0b150b4
+    - very good- but does not talk about mounting volumes
+    - "from-env-file" method which converts file contents to literals
+https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap
+    - "from-env-file" method which converts file contents to literals
+    
+- Official docs
 https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap
 https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#create-configmaps-from-directories
 https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#create-configmaps-from-files
@@ -91,8 +154,12 @@ https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap
   (also https://kubernetes.io/docs/concepts/storage/volumes/#configmap)
 https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#define-container-environment-variables-using-configmap-data
   
+- CONFIGMAP - restarting pods upon changes to configmap
+https://blog.questionable.services/article/kubernetes-deployments-configmap-change/
+    - in 1.15 onwards automated
 
-
+====================================
+KUBERNETES INSTALL/CONFIG - HA
 
   Concept explained:
   https://elastisys.com/2018/01/25/setting-highly-available-kubernetes-clusters/
@@ -419,6 +486,7 @@ https://coreos.com/etcd/docs/latest/op-guide/runtime-configuration.html
 
 https://github.com/etcd-io/etcd/tree/master/etcdctl
 
+https://github.com/etcd-io/etcd/blob/master/Documentation/op-guide/container.md --> ETCD wit containers
 https://github.com/etcd-io/etcd/blob/master/Documentation/op-guide/security.md  --> ETCD security, keys, certs
 https://coreos.com/etcd/docs/latest/v2/security.html --> ETCD security, keys, certs
 https://coreos.com/etcd/docs/latest/op-guide/security.html --> ETCD security, keys, certs, auto-tls
@@ -445,3 +513,16 @@ https://thenewstack.io/klusterkit-combines-3-open-source-tools-for-managing-kube
 RUNNING APPLICATIONS ON K8S
 ==============================
 HAPROXY on K8s: https://www.bluematador.com/blog/running-haproxy-docker-containers-kubernetes
+
+==============================
+CONTAINER NETWORKING CNI
+==============================
+https://github.com/containernetworking/cni
+https://github.com/coreos/flannel/blob/master/Documentation/kubernetes.md
+--> https://github.com/containernetworking/plugins
+
+==============================
+EXAMPLES
+==============================
+https://github.com/infrabricks/kubernetes-standalone/blob/master/examples/alpine.yml
+https://gist.github.com/matthewpalmer
