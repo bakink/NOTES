@@ -10,7 +10,24 @@ Official docs/sites:
   https://golang.org/pkg/os/exec/ --> ssh command on a remote machine
    golang.org/x/crypto/ssh
 
-TUTORIAL - https://golangbot.com/learn-golang-series/ (comptgt)
+TUTORIAL
+https://golangbot.com/learn-golang-series/ (comp)
+https://www.bogotobogo.com/GoLang/GoLang_HelloWorld.php --> very good series
+https://www.bogotobogo.com/GoLang/GoLang_AWS_SDK_for_Go.php --> with s3 aws sdk
+https://tutorialedge.net/golang/go-waitgroup-tutorial/ - all concepts, redis ...
+
+PLAYGROUND 
+- goplayground
+
+Project/Folder Layout
+- https://github.com/golang-standards/project-layout
+  https://github.com/golang-standards/project-layout/cmd and so on
+- good example
+  https://eli.thegreenplace.net/2019/simple-go-project-layout-with-modules/
+
+Functions - pointer functions (pointer receivers)
+https://www.geeksforgeeks.org/pointers-to-a-function-in-go/
+https://tour.golang.org/methods/4
 
 Cobra & Viper
 https://github.com/spf13/cobra - command generator
@@ -21,6 +38,7 @@ To import dependencies - "go modules" - https://github.com/golang/go/wiki/Module
 https://roberto.selbach.ca/intro-to-go-modules/ --> tutorial
 https://github.com/go-modules-by-example
 https://ukiahsmith.com/blog/a-gentle-introduction-to-golang-modules/
+https://medium.com/@adiach3nko/package-management-with-go-modules-the-pragmatic-guide-c831b4eaaf31 --> vendor folder 
 
 Directory structure:
 https://stackoverflow.com/questions/46646559/golang-project-directory-structure
@@ -64,7 +82,8 @@ REST API using Go -
 https://www.codementor.io/codehakase/building-a-restful-api-with-golang-a6yivzqdo
 https://thenewstack.io/make-a-restful-json-api-go/  (with gorilla mux)
 
-Learn:
+Learn/docs:
+https://tour.golang.org/methods/4
 https://golangbot.com/learn-golang-series/
 https://gobyexample.com/arrays
 https://hackernoon.com/basics-of-golang-for-beginners-6bd9b40d79ae
@@ -77,3 +96,46 @@ https://stackoverflow.com/questions/38110875/how-to-display-html-string-as-a-web
 
 Run OS Commands:
 https://nathanleclaire.com/blog/2014/12/29/shelled-out-commands-in-golang/
+
+Goroutines and channels:
+https://www.golang-book.com/books/intro/10 --> has channels also
+https://www.geeksforgeeks.org/goroutines-concurrency-in-golang/
+https://gobyexample.com/goroutines
+https://tour.golang.org/concurrency/1
+
+http://codesolid.com/post/optimizing-aws-s3-uploads-with-golang-and-goroutines/ --> with AWS s3
+
+INTERFACES:
+https://www.callicoder.com/golang-interfaces/ - better example
+https://www.geeksforgeeks.org/interfaces-in-golang/
+https://www.geeksforgeeks.org/embedding-interfaces-in-golang/
+
+Interfaces: Empty interfaces, using in function as argument
+https://flaviocopes.com/go-empty-interface/
+
+Interfaces embedding in struct - "type embedding":
+https://travix.io/type-embedding-in-go-ba40dd4264df
+https://www.ardanlabs.com/blog/2015/09/composition-with-go.html --> good blog on embedding
+
+Receivers: like this --> func(i InputType) funcname()
+- Pointer receivers - https://tour.golang.org/methods/4
+- Receiver vs function argument - https://grisha.org/blog/2016/09/22/golang-receiver-vs-function/
+
+JSON:
+- https://www.sohamkamani.com/blog/2017/10/18/parsing-json-in-golang/
+
+TESTING:
+https://ieftimov.com/post/testing-in-go-go-test/
+
+RANDOM STRING GENERATOR:
+https://www.calhoun.io/creating-random-strings-in-go/
+
+HTTP RESPONSE WRITER:
+- Includes JSON: https://medium.com/@vivek_syngh/http-response-in-golang-4ca1b3688d6
+
+GOOD BLOGS - ARDANLABS
+https://www.ardanlabs.com/blog/2020/02/modules-04-mirros-checksums-athens.html - modules
+https://www.ardanlabs.com/blog/2015/09/composition-with-go.html - interfaces
+
+FILE HANDLING
+https://golangbot.com/write-files/
