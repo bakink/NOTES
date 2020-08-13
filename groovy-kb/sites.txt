@@ -1,1 +1,81 @@
-http://www.vogella.com/tutorials/Groovy/article.html
+SOME MAIN DOCS
+https://groovy-lang.org/structure.html --> Apache groovy main doc
+
+TUTORIALS
+https://www.tutorialspoint.com/groovy/groovy_overview.htm
+http://www.vogella.com/tutorials/Groovy/article.html - with Eclipse IDE
+
+GRADLE
+Groovy project with gradle:
+(also has test cases)
+https://gradle.org/guides/
+--> https://guides.gradle.org/building-groovy-libraries/ --> USE THIS --> for 'library' development - can do app too
+https://www.tutorialspoint.com/gradle/gradle_build_a_groovy_project.htm --> more info
+
+Groovy plugin for gradle:
+https://docs.gradle.org/current/userguide/groovy_plugin.html
+
+RATPACK:
+https://ratpack.io/manual/current/index.html
+
+TRAINING ONLINE
+https://app.pluralsight.com/library/courses/setting-up-java-development-environment/table-of-contents
+https://learning.oreilly.com/library/view/learning-ratpack/9781491921654/ch01.html (O’Reilly Online Learning)
+https://learning.oreilly.com/videos/the-complete-apache/9781839217876/9781839217876-video10_3?autoplay=false (O’Reilly Online Learning)
+
+ADDING LOGGING SUPPORT WITH GRADLE: slf4j
+http://www.slf4j.org/manual.html
+READ THIS: https://chburmeister.github.io/2017/02/22/logging-in-groovy-with-replaceable-logger-implementations.html
+
+https://stackoverflow.com/questions/44111973/slf4j-loggerfactory-class-definition-not-found-with-gradle
+http://makble.com/gradle-slf4j-integration-example-with-eclipse
+https://dzone.com/articles/logback-configuration-using-groovy --> READ THIS
+https://dzone.com/articles/groovy-and-log4j
+https://logging.apache.org/log4j/1.2/manual.html#defaultInit
+
+https://myshittycode.com/2017/04/03/groovy-log-annotation/ --> good example
+https://github.com/myott/jmanor --> code with ratpack (did not compile properly)
+https://guides.micronaut.io/micronaut-scheduled-groovy/guide/index.html --> good example
+https://stackoverflow.com/questions/15981182/logging-in-groovy-script/15994629 --> example alongwith ch.qos
+
+TROUBLESHOOTING:
+$ gradlew run
+
+> Task :run
+Hello world.
+Printing: hello groovy from class HelloWorld
+log4j:WARN No appenders could be found for logger (helloapp.logger.HelloLogger).
+log4j:WARN Please initialize the log4j system properly.
+log4j:WARN See http://logging.apache.org/log4j/1.2/faq.html#noconfig for more info.
+
+https://stackoverflow.com/questions/8943661/please-initialize-the-log4j-system-properly-warning
+https://dzone.com/articles/groovy-and-log4j
+
+https://logging.apache.org/log4j/2.x/manual/configuration.html 
+
+RATPACK-GROOVY:
+https://ratpack.io/manual/current/groovy.html
+
+MYSQL AND GROOVY:
+https://www.tutorialspoint.com/groovy/groovy_database.htm
+
+DB PROGRAMMING - sql class:
+https://docs.groovy-lang.org/latest/html/api/groovy/sql/Sql.html - the 'sql' class
+https://www.codota.com/code/java/classes/groovy.sql.Sql - the 'sql' class
+
+sql.rows vs sql.eachRow: https://stackoverflow.com/questions/6116198/groovy-sql-eachrow-and-rows-method
+
+DB PROGRAMMING - DAO:
+DAO in Java - https://www.baeldung.com/java-dao-pattern
+DAO in Java for MySql DB - https://dzone.com/articles/building-simple-data-access-layer-using-jdbc
+DAO in Groovy - https://dzone.com/articles/data-access-module-using
+DAO in Java (very nice example) - https://www.tutorialspoint.com/design_pattern/data_access_object_pattern.htm 
+DAO Spring-Oracle with Dao<T> - https://www.logicbig.com/tutorials/spring-framework/spring-data-access-with-jdbc/connect-oracle.html
+DAO without <T> - https://www.journaldev.com/16813/dao-design-pattern
+https://www.oracle.com/technetwork/java/dataaccessobject-138824.html
+
+DB PROGRAMMING - VARIOUS:
+http://groovy-lang.org/databases.html - JDBCDataSource, resultset, execute,  and other methods
+https://www.baeldung.com/jdbc-groovy --> nice
+https://www.tutorialspoint.com/groovy/groovy_database.htm - mysql, 'execute' method
+https://stackoverflow.com/questions/26901229/how-to-convert-sql-result-set-to-json-in-groovy - resultset to json

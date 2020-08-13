@@ -1,0 +1,153 @@
+===================
+MULTI LEVEL NESTED
+===================
+https://stackoverflow.com/questions/18592173/select-objects-based-on-value-of-variable-in-object-using-jq (multi level)
+https://stackoverflow.com/questions/39798542/using-jq-to-fetch-key-value-from-json-output (simple)
+https://shapeshed.com/jq-json/ (simple)
+
+Data in data.json:
+
+{
+  "Stores": [
+    {
+      "StoreName": "s1",
+      "items": [
+        "item234"
+      ]
+    },
+    {
+      "StoreName": "s2",
+      "items": [
+        "item375",
+        "item025"
+      ]
+    },
+    {
+      "StoreName": "s3",
+      "items": [
+        "item100",
+        "item825"
+      ]
+    }
+  ]
+}
+
+
+- LIST STORES
+cat data.json | jq -r '.[] | .[] | .StoreName'
+
+Output:
+s1
+s2
+s3
+
+- LIST ITEMS FOR A STORE
+cat data.json | jq -r '.[] | .[] | select(.StoreName=="s2") | .items'
+
+Output:
+[
+  "item375",
+  "item025"
+]
+
+
+======================================
+DELETE AN ITEM, REDIRECT TO FILE
+======================================
+https://stackoverflow.com/questions/48964305/write-output-to-a-file-after-piped-to-jq
+
+
+To just beautify and output:
+cat x.json | jq '.' > x-beautified.json
+
+
+To do some operation as well:
+cat config.json | jq 'del(.ProgramSecrets)'  > p
+
+If that simple cat does not work try this:
+
+$ cat config.json
+
+{
+    "ProgramSettings":
+    {
+        "version": "1.0"
+    },
+    "ProgramSecrets":
+    {
+        "AWS_ACCESS_KEY_ID": "",
+        "AWS_SECRET_ACCESS_KEY": ""
+    }
+}
+assume you want remove object 'ProgramSecrets' from JSON file:
+
+$ echo $(cat config.json | jq 'del(.ProgramSecrets)') > config.json
+$ cat config.json
+{ "ProgramSettings": { "version": "1.0" } }
+
+===========
+GETTING TSV
+===========
+while read rs cont; do echo $rs $cont; done < <(kubectl get rs -o json | jq -r '.items[].spec.template | .metadata.labels["replication-controller"] as $rs | .spec.containers[] | select(.livenessProbe != null) | [$rs,.name] | @tsv')
+
+while read rs cont; do kubectl patch rs $rs -p '{"spec":{"template":{"spec":{"containers":[{"name":"'$cont'","livenessProbe":{"failureThreshold":1002}}]}}}}' $rs $cont; done < <(kubectl get rs -o json | jq -r '.items[].spec.template | .metadata.labels["replication-controller"] as $rs | .spec.containers[] | select(.livenessProbe != null) | [$rs,.name] | @tsv')
+
+================================================
+PROMETHEUS - QUERY OUTPUT MANIPULATION
+================================================
+
+curl 'https://local-prometheus-server.ingresslocal1234.company.com/api/v1/query_range?query=k8s_infra_cpu_Container5mAvgMillicore%7Binstance%3D%22t1234node3%22%7D&start=2020-04-30T05:39:00.781Z&end=2020-04-30T05:39:00.781Z&step=60s' > out1
+jq '.data.result | length' out1
+jq '.data.result' out1  > out1.data.result
+
+#jq -r ".[] | .metric.pod_name" out1.data.result > out1.data.result.pod
+#jq -r ".[] | .metric.container_name,.values[0][1]" out1.data.result > out1.data.result.container
+#jq -r ".[] | .values[0][1]" out1.data.result > out1.data.result.cpu
+
+
+#jq -r ".[] | .metric.store" out1.data.result
+#jq -r ".[] | .metric.container_name,.values[0][1]" out1.data.result
+#jq -r ".[] | .metric.pod_name,.metric.container_name,.values[0][1]" out1.data.result
+
+# To get CSV
+#jq -r ".[] | [.metric.pod_name,.metric.container_name,.values[0][1]] | @csv"  out2.data.result
+# To get TSV
+#jq -r ".[] | [.metric.pod_name,.metric.container_name,.values[0][1]] | @tsv"  out2.data.result
+
+
+================================================
+PROMETHEUS - QUERY OUTPUT MANIPULATION
+================================================
+
+# jq it like this: (https://shapeshed.com/jq-json/)
+# cat b |jq -r '.metric.container_name,.values[0][1]'
+
+# error
+#curl -k -G --data-urlencode 'query=sort_desc(k8s_infra_cpu_Container5mAvgMillicore{instance="t2434m0003"})&time=2020-04-30T05:40:00.781Z' https://local-prometheus-server.ingresst2434.company.com/api/v1/query
+
+# error
+#curl -k -G --data-urlencode 'query=k8s_infra_cpu_Container5mAvgMillicore&time=2020-04-30T05:40:00.781Z' https://local-prometheus-server.ingresst2434.company.com/api/v1/query
+
+# works - for a specific time
+curl -k 'https://local-prometheus-server.ingresst2434.company.com/api/v1/query?query=k8s_infra_cpu_Container5mAvgMillicore&time=2020-04-30T05:40:00.781Z'
+
+# works - for a specific time  (by giving both start and end times as same)
+curl 'https://local-prometheus-server.ingresst2434.company.com/api/v1/query_range?query=k8s_infra_cpu_Container5mAvgMillicore%7Binstance%3D%22t2434mws0003%22%7D&start=2020-04-30T05:39:00.781Z&end=2020-04-30T05:39:00.781Z&step=60s'
+
+# works - for a range of time, at 60 seconds steps
+#curl 'https://local-prometheus-server.ingresst2434.company.com/api/v1/query_range?query=k8s_infra_cpu_Container5mAvgMillicore%7Binstance%3D%22t2434mws0003%22%7D&start=2020-04-30T05:39:00.781Z&end=2020-04-30T05:49:00.781Z&step=60s'
+
+#curl 'https://local-prometheus-server.ingresst2434.company.com/api/v1/query_range?query=k8s_infra_cpu_Container5mAvgMillicore%7Binstance%3D%22t2434mws0003%22%7D&start=2020-04-30T05:39:00.781Z&end=2020-04-30T05:39:00.781Z&step=60s'
+
+# error
+#curl 'https://local-prometheus-server.ingresst2434.company.com/api/v1/query_range?query=k8s_infra_cpu_Container5mAvgMillicore%7Binstance%3D%22t2434mws0003%22%7D&time=2020-04-30T05:39:00.781Z'
+
+
+#======================================================
+# Containers sorted by CPU at a given point in time
+#======================================================
+curl 'https://local-prometheus-server.ingresst2434.company.com/api/v1/query_range?query=k8s_infra_cpu_Container5mAvgMillicore%7Binstance%3D%22t2434mws0003%22%7D&start=2020-04-30T05:39:00.781Z&end=2020-04-30T05:39:00.781Z&step=60s' > out1
+jq '.data.result | length' out1
+jq '.data.result' out1  > out1.data.result
+jq -r ".[] | .metric.store" out1.data.result
+jq -r ".[] | .metric.container_name,.values[0][1]" out1.data.resul

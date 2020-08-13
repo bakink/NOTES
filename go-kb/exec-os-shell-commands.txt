@@ -1,0 +1,92 @@
+https://golang.org/pkg/os/exec/
+https://www.openshift.com/blog/executing-commands-in-pods-using-k8s-api
+https://github.com/kubernetes-client/python/issues/842
+- https://github.com/kubernetes-client/python/blob/master/examples/pod_exec.py
+https://blog.kowalczyk.info/article/wOYk/advanced-command-execution-in-go-with-osexec.html - many examples, stdin capture etc
+
+========
+Example
+========
+package main
+
+import (
+	"bytes"
+	"fmt"
+	"log"
+	"os/exec"
+	"strings"
+)
+
+func main() {
+	cmd := exec.Command("tr", "a-z", "A-Z")
+	cmd.Stdin = strings.NewReader("some input")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("in all caps: %q\n", out.String())
+}
+
+========================
+Example: (environment)
+========================
+package main
+
+import (
+	"log"
+	"os"
+	"os/exec"
+)
+
+func main() {
+	cmd := exec.Command("prog")
+	cmd.Env = append(os.Environ(),
+		"FOO=duplicate_value", // ignored
+		"FOO=actual_value",    // this value is used
+	)
+	if err := cmd.Run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+========================
+Example: Command Output
+========================
+package main
+
+import (
+	"fmt"
+	"log"
+	"os/exec"
+)
+
+func main() {
+	cmd := exec.Command("sh", "-c", "echo stdout; echo 1>&2 stderr")
+	stdoutStderr, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%s\n", stdoutStderr)
+}
+
+========================================
+Example: Combined output and error
+========================================
+package main
+
+import (
+	"fmt"
+	"log"
+	"os/exec"
+)
+
+func main() {
+	cmd := exec.Command("sh", "-c", "echo stdout; echo 1>&2 stderr")
+	stdoutStderr, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%s\n", stdoutStderr)
+}

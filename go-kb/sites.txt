@@ -10,11 +10,48 @@ Official docs/sites:
   https://golang.org/pkg/os/exec/ --> ssh command on a remote machine
    golang.org/x/crypto/ssh
 
+WEB STUFF
+Basic web with http and router  & JSON: https://thenewstack.io/make-a-restful-json-api-go/ (has serving a json)
+https://medium.com/the-andela-way/build-a-restful-json-api-with-golang-85a83420c9da (json and also mux.vars)
+Gorilla mux vs http for routes: https://levelup.gitconnected.com/experiment-golang-http-builtin-and-related-popular-packages-1d9a6dcb80d
+Marshal, Render - json, xml etc: https://www.alexedwards.net/blog/golang-response-snippets#json
+Unmarshall json to map (not to another json): https://medium.com/@irshadhasmat/golang-simple-json-parsing-using-empty-interface-and-without-struct-in-go-language-e56d0e69968
+- (also empty struct)
+
+For extended http code: http://networkbit.ch/golang-http-client/
+Parse to byte-array/map and struct: https://www.sohamkamani.com/blog/2017/10/18/parsing-json-in-golang/
+Printing requests to debug: https://medium.com/doing-things-right/pretty-printing-http-requests-in-golang-a918d5aaa000
+
+- complex example:
+https://stackoverflow.com/questions/17156371/how-to-get-json-response-from-http-get - COMPLEX EXAMPLE - decoder vs readall (but decoder method is not working)
+(also Web, Json with Struct+slice https://stackoverflow.com/questions/17156371/how-to-get-json-response-from-http-get) 
+
+IOUtil to get response body in json: https://stackoverflow.com/questions/41815909/is-there-a-way-to-extract-json-from-an-http-response-without-having-to-build-str
+IOUtil to get response body in json: https://stackoverflow.com/questions/39945968/most-efficient-way-to-convert-io-readcloser-to-byte-array
+
+To place token in header: https://developer.github.com/v3/
+Response to byte-array: https://stackoverflow.com/questions/39945968/most-efficient-way-to-convert-io-readcloser-to-byte-array
+Response to byte-array: https://stackoverflow.com/questions/41815909/is-there-a-way-to-extract-json-from-an-http-response-without-having-to-build-str
+
+
 TUTORIAL
-https://golangbot.com/learn-golang-series/ (comp)
+
 https://www.bogotobogo.com/GoLang/GoLang_HelloWorld.php --> very good series
-https://www.bogotobogo.com/GoLang/GoLang_AWS_SDK_for_Go.php --> with s3 aws sdk
+-https://www.bogotobogo.com/GoLang/GoLang_AWS_SDK_for_Go.php --> with s3 aws sdk
+-https://www.bogotobogo.com/GoLang/GoLang_Web_Building_Docker_Image_and_Deploy_to_Kubernetes.php
+https://golangbot.com/learn-golang-series/ (comp)
+https://www.tutorialspoint.com/go/go_arrays.htm
 https://tutorialedge.net/golang/go-waitgroup-tutorial/ - all concepts, redis ...
+
+https://notes.shichao.io/gopl/
+
+EXAMPLES
+https://levelup.gitconnected.com/building-a-todo-api-in-golang-with-kubernetes-1ec593f85029 --> API with postgres
+
+GOROUTINES, CHANNELS
+https://notes.shichao.io/gopl/ch8/
+Is go routine alive: https://stackoverflow.com/questions/55273965/how-to-know-if-goroutine-still-exist/55276876
+
 
 PLAYGROUND 
 - goplayground
@@ -39,6 +76,8 @@ https://roberto.selbach.ca/intro-to-go-modules/ --> tutorial
 https://github.com/go-modules-by-example
 https://ukiahsmith.com/blog/a-gentle-introduction-to-golang-modules/
 https://medium.com/@adiach3nko/package-management-with-go-modules-the-pragmatic-guide-c831b4eaaf31 --> vendor folder 
+https://go.googlesource.com/proposal/+/master/design/25719-go15vendor.md --> vendor folder
+https://www.reddit.com/r/golang/comments/9ai79z/correct_usage_of_go_modules_vendor_still_connects/ --> vendor folder
 
 Directory structure:
 https://stackoverflow.com/questions/46646559/golang-project-directory-structure
@@ -56,6 +95,7 @@ GOPATH:
 https://stackoverflow.com/questions/36017724/can-i-have-multiple-gopath-directories
 
 Docker:
+Build docker image with golang web server - https://levelup.gitconnected.com/complete-guide-to-create-docker-container-for-your-golang-application-80f3fb59a15e
 https://medium.com/@petomalina/using-go-mod-download-to-speed-up-golang-docker-builds-707591336888
 
 Cobra:
@@ -106,7 +146,12 @@ https://tour.golang.org/concurrency/1
 http://codesolid.com/post/optimizing-aws-s3-uploads-with-golang-and-goroutines/ --> with AWS s3
 
 INTERFACES:
-https://www.callicoder.com/golang-interfaces/ - better example
+
+Three main ones:
+  https://www.tutorialspoint.com/go/go_interfaces.htm - same as above, with a twist
+  https://www.callicoder.com/golang-interfaces/ - better example, and also interfaces as function arguments etc
+  https://www.ardanlabs.com/blog/2015/09/composition-with-go.html --> good blog on embedding
+
 https://www.geeksforgeeks.org/interfaces-in-golang/
 https://www.geeksforgeeks.org/embedding-interfaces-in-golang/
 
@@ -115,14 +160,12 @@ https://flaviocopes.com/go-empty-interface/
 
 Interfaces embedding in struct - "type embedding":
 https://travix.io/type-embedding-in-go-ba40dd4264df
-https://www.ardanlabs.com/blog/2015/09/composition-with-go.html --> good blog on embedding
 
 Receivers: like this --> func(i InputType) funcname()
 - Pointer receivers - https://tour.golang.org/methods/4
 - Receiver vs function argument - https://grisha.org/blog/2016/09/22/golang-receiver-vs-function/
 
-JSON:
-- https://www.sohamkamani.com/blog/2017/10/18/parsing-json-in-golang/
+Empty interface: https://flaviocopes.com/go-empty-interface/ ($$$)
 
 TESTING:
 https://ieftimov.com/post/testing-in-go-go-test/
@@ -139,3 +182,101 @@ https://www.ardanlabs.com/blog/2015/09/composition-with-go.html - interfaces
 
 FILE HANDLING
 https://golangbot.com/write-files/
+https://yourbasic.org/golang/read-file-line-by-line/ - also stdin
+https://stackoverflow.com/questions/20895552/how-to-read-from-standard-input-in-the-console - stdin
+
+ARRAYS AND SLICES
+Multidimenstional slices
+- https://forum.golangbridge.org/t/multidimensional-slice/4863
+- https://www.dotnetperls.com/2d-go
+
+Slice with make() function
+- https://www.tutorialspoint.com/go/go_slice.htm
+
+Multidimensional Arrays
+- https://www.tutorialspoint.com/go/go_multi_dimensional_arrays.htm
+- https://www.dotnetperls.com/2d-go
+
+Arrays
+- https://www.tutorialspoint.com/go/go_arrays.htm
+
+Slice - size, increase size, PrintSlice function
+- https://tour.golang.org/moretypes/11
+
+HTTP AUTHENTICATION/AUTHORIZATION
+- Oauth
+https://www.sohamkamani.com/golang/2018-06-24-oauth-with-golang/ -- with github api
+https://developer.github.com/v3/ --> to send token in header
+https://blog.kowalczyk.info/article/f/accessing-github-api-from-go.html -- with github api
+
+- Bearer token, JWT
+https://golangcode.com/api-auth-with-jwt/
+ - https://github.com/dgrijalva/jwt-go
+ - https://jwt.io/introduction/
+https://auth0.com/blog/authentication-in-golang/
+https://stackoverflow.com/questions/51452148/how-can-i-make-a-request-with-a-bearer-token-in-go
+
+- TLS
+https://gist.github.com/denji/12b3a568f092ab951456
+
+HTTP SERVER
+With timeout etc: https://golang.org/pkg/net/http/
+
+HTTP REQUEST/RESPONSE HANDLING
+For extended http code: http://networkbit.ch/golang-http-client/
+For printing http requests to debug: https://medium.com/doing-things-right/pretty-printing-http-requests-in-golang-a918d5aaa000
+
+
+SLICES
+https://stackoverflow.com/questions/18042439/go-append-to-slice-in-struct - append a slice of structs
+
+ERRORS
+Create error - 3 ways: https://yourbasic.org/golang/create-error/
+
+PARSING JSON, XML etc
+Theory - https://blog.golang.org/json
+https://www.sohamkamani.com/blog/2017/10/18/parsing-json-in-golang/
+https://stackoverflow.com/questions/17156371/how-to-get-json-response-from-http-get
+https://blog.josephmisiti.com/parsing-json-responses-in-golang
+
+Marshal - json, xml etc: https://www.alexedwards.net/blog/golang-response-snippets#json
+Unmarshal - https://www.alexedwards.net/blog/how-to-properly-parse-a-json-request-body
+Unmarshall json to map (not to another json): https://medium.com/@irshadhasmat/golang-simple-json-parsing-using-empty-interface-and-without-struct-in-go-language-e56d0e69968 
+  - without struct, with map and interface like: var results []map[string]interface{}
+  - (also empty struct)
+
+https://golang.org/src/encoding/json/example_test.go - decoder
+
+- complex example:
+https://stackoverflow.com/questions/17156371/how-to-get-json-response-from-http-get - COMPLEX EXAMPLE - decoder vs readall (but decoder method is not working)
+(also Web, Json with Struct+slice https://stackoverflow.com/questions/17156371/how-to-get-json-response-from-http-get) 
+
+https://stackoverflow.com/questions/21197239/decoding-json-using-json-unmarshal-vs-json-newdecoder-decode - unmarshall vs decoder
+
+DATE-TIME IN JSON:
+https://hackernoon.com/today-i-learned-dealing-with-json-datetime-when-unmarshal-in-golang-4b281444fb67 --> in postman
+https://www.ardanlabs.com/blog/2013/08/using-time-timezones-and-location-in-go.html --> central time etc
+
+PROJETS TO WORK ON
+https://www.opsdash.com/blog/fun-weekend-projects-golang.html
+- Slack bot - https://www.opsdash.com/blog/slack-bot-in-golang.html
+
+ENDPOINT PARAMETERS, ARGUMENTS, DATA, FORMDATA ETC
+Form: Postman Body: x-www-form-urlencoded - https://medium.com/@edwardpie/processing-form-request-data-in-golang-2dff4c2441be
+Multipart Form to upload a file: for image upload: https://stackoverflow.com/questions/20205796/post-data-using-the-content-type-multipart-form-data 
+Multipart form to upload a file: https://gist.github.com/mattetti/5914158/f4d1393d83ebedc682a3c8e7bdc6b49670083b84
+
+WEB FILE UPLOAD/DOWNLOAD RELATED
+
+Download a file:
+https://golangcode.com/download-a-file-from-a-url/
+
+Multipart Form:
+Upload a file to a remote location: https://gist.github.com/mattetti/5914158
+Upload a file to a remote location: https://stackoverflow.com/questions/20205796/post-data-using-the-content-type-multipart-form-data
+
+FileServer: 
+To serve a file: https://medium.com/rungo/beginners-guide-to-serving-files-using-http-servers-in-go-4e542e628eac
+To serve a file: https://golang.org/pkg/net/http/#example_FileServer
+To receive a file: https://stackoverflow.com/questions/40684307/how-can-i-receive-an-uploaded-file-using-a-golang-net-http-server
+                      - https://kenyaappexperts.com/blog/how-to-upload-files-in-go-step-by-step/

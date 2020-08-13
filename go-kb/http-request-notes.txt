@@ -1,0 +1,24 @@
+=============================
+HTTP REQUESTS
+=============================
+
+=============================
+DATA INPUT METHODS
+=============================
+Query Parameters
+- https://golangcode.com/get-a-url-parameter-from-a-request/ (localhost:8080/?key=hello%20golangcode.com)
+- https://stackoverflow.com/questions/15407719/in-gos-http-package-how-do-i-get-the-query-string-on-a-post-request
+
+Form Data
+- https://medium.com/@edwardpie/processing-form-request-data-in-golang-2dff4c2441be
+
+Multipart Form
+- https://gist.github.com/mattetti/5914158
+- https://stackoverflow.com/questions/20205796/post-data-using-the-content-type-multipart-form-data
+
+Json
+
+Mux Vars (gorilla mux)
+Inputs like the 'id' in http://abc.com/id
+- https://medium.com/the-andela-way/build-a-restful-json-api-with-golang-85a83420c9da
+
